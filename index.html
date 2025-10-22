@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Airflow Balancing Tool</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      max-width: 100%;
+      margin: 0 auto;
+    }
+    input, button {
+      padding: 5px;
+      margin: 2px 0;
+      font-size: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 4px 8px;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .highlight {
+      background-color: #ffff99;
+    }
+    #summary {
+      margin-top: 20px;
+      white-space: pre-line;
+    }
+    .highlight-if-changed {
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+    .needs-change {
+      background-color: #ffff99;
+    }
+    input[type="number"] {
+      width: 50px;
+      font-size: 12px;
+      text-align: center;
+    }
+    @media (max-width: 600px) {
+      body { padding: 10px; }
+      table { font-size: 10px; }
+      input[type="number"] { width: 40px; }
+      th, td { padding: 3px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Airflow Balancing Tool</h1>
+
+  <div>
+    <label for="fanName">Fan Name:</label>
+    <input type="text" id="fanName" placeholder="Enter fan name">
+  </div>
+  <div>
+    <label for="fanSpeed">Current Fan Speed (%):</label>
+    <input type="number" id="fanSpeed" min="0" max="100" value="50" onchange="updateCalculations()">
+    <span>Recommended Fan Speed: <span id="recommendedFanSpeed" class="highlight-if-changed">50%</span></span>
+  </div>
+  <div>
+    <input type="checkbox" id="useCorrectionFactor" onchange="toggleCorrectionFactor()">
+    <label for="useCorrectionFactor">Use Correction Factor</label>
+    <input type="number" id="correctionFactor" min="0.1" step="0.1" value="1.0" onchange="updateCalculations()" style="display: none;">
+  </div>
+
+  <table id="grilleTable">
+    <tr id="headerRow">
+      <th>Grille</th>
+      <th>Req Flow</th>
+      <th>Curr. Flow</th>
+      <th>Curr. Damper</th>
+      <th>Rec. Damper</th>
+      <th>% of Total</th>
+      <th>Action</th>
+    </tr>
+  </table>
+
+  <button onclick="addGrille()">Add Grille</button>
+  <button onclick="clearAll()">Clear All</button>
+  <button onclick="sortGrilles()">Sort Grilles Alphabetically</button>
+
+  <div>
+    <p>Total Current Airflow: <span id="totalAirflow">0</span></p>
+    <p id="totalCorrectedAirflowRow" style="display: none;">Total Corrected Airflow: <span id="totalCorrectedAirflow">0</span></p>
+    <p>Total Required Airflow: <span id="totalRequiredAirflow">0</span></p>
+    <p>Percentage of Total Required Airflow: <span id="percentageRequiredAirflow">0%</span></p>
+    <p>Average Airflow of Grilles: <span id="averageAirflow">0</span></p>
+  </div>
+  <div id="summary"></div>
+
+  <script>
+    let grilleCount = 0;
+
+    function saveState() {
+      const state = {
+        fanName: document.getElementById('fanName').value,
+        fanSpeed: document.getElementById('fanSpeed').value,
+        useCorrectionFactor: document.getElementById('useCorrectionFactor').checked,
+        correctionFactor: document.getElementById('correctionFactor').value,
+        grilles: []
+      };
+      const table = document.getElementById('grilleTable');
+      for (let i = 1; i < table.rows.length; i++) {
+        const cells = table.rows[i].getElementsByTagName('input');
+        const grille = {
+          label: cells[0]?.value || '',
+          required: cells[1]?.value || '',
+          current: cells[2]?.value || '',
+          damper: cells[cells.length - 1]?.value || ''
+        };
+        state.grilles.push(grille);
+      }
+      localStorage.setItem('airflowToolState', JSON.stringify(state));
+    }
+
+    function loadState() {
+      const saved = localStorage.getItem('airflowToolState');
+      if (!saved) return;
+      const state = JSON.parse(saved);
+
+      document.getElementById('fanName').value = state.fanName || '';
+      document.getElementById('fanSpeed').value = state.fanSpeed || 50;
+      document.getElementById('useCorrectionFactor').checked = !!state.useCorrectionFactor;
+      document.getElementById('correctionFactor').value = state.correctionFactor || 1.0;
+
+      const table = document.getElementById('grilleTable');
+      while (table.rows.length > 1) table.deleteRow(1);
+      grilleCount = 0;
+      state.grilles.forEach(g => {
+        addGrille(g.label, g.required, g.current, g.damper);
+      });
+      updateCalculations();
+    }
+
+    function toggleCorrectionFactor() {
+      const checkbox = document.getElementById('useCorrectionFactor');
+      const correctionFactorInput = document.getElementById('correctionFactor');
+      const headerRow = document.getElementById('headerRow');
+      const totalCorrectedAirflowRow = document.getElementById('totalCorrectedAirflowRow');
+
+      if (checkbox.checked) {
+        correctionFactorInput.style.display = 'inline-block';
+        if (!headerRow.cells[3] || headerRow.cells[3].innerText !== 'Corr. Flow')
+          headerRow.insertCell(3).outerHTML = '<th>Corr. Flow</th>';
+        totalCorrectedAirflowRow.style.display = 'block';
+      } else {
+        correctionFactorInput.style.display = 'none';
+        if (headerRow.cells[3] && headerRow.cells[3].innerText === 'Corr. Flow')
+          headerRow.deleteCell(3);
+        totalCorrectedAirflowRow.style.display = 'none';
+      }
+
+      updateCalculations();
+      saveState();
+    }
+
+    function addGrille(name = '', required = '', current = '', damper = '100') {
+      grilleCount++;
+      const table = document.getElementById('grilleTable');
+      const row = table.insertRow(-1);
+      let cellIndex = 0;
+      row.insertCell(cellIndex++).innerHTML = `<input type="text" placeholder="Grille ${grilleCount}" value="${name}" onchange="updateCalculations()">`;
+      row.insertCell(cellIndex++).innerHTML = `<input type="number" placeholder="Required" value="${required}" onchange="updateCalculations()">`;
+      row.insertCell(cellIndex++).innerHTML = `<input type="number" placeholder="Current" value="${current}" onchange="updateCalculations()">`;
+      if (document.getElementById('useCorrectionFactor').checked) row.insertCell(cellIndex++).innerHTML = '';
+      row.insertCell(cellIndex++).innerHTML = `<input type="number" value="${damper}" min="0" max="100" onchange="updateCalculations()">`;
+      row.insertCell(cellIndex++).innerHTML = '<span></span>';
+      row.insertCell(cellIndex++).innerHTML = '';
+      row.insertCell(cellIndex++).innerHTML = '<button onclick="removeGrille(this)">Remove</button>';
+      updateCalculations();
+      saveState();
+    }
+
+    function removeGrille(button) {
+      button.closest('tr').remove();
+      updateCalculations();
+      saveState();
+    }
+
+    function clearAll() {
+      if (!confirm('Clear all data (this will also remove saved data)?')) return;
+      const table = document.getElementById('grilleTable');
+      while (table.rows.length > 1) table.deleteRow(1);
+      grilleCount = 0;
+      localStorage.removeItem('airflowToolState');
+      updateCalculations();
+    }
+
+    function sortGrilles() {
+      const table = document.getElementById('grilleTable');
+      const rows = Array.from(table.rows).slice(1);
+      rows.sort((a, b) => {
+        const nameA = a.cells[0].querySelector('input').value.toLowerCase();
+        const nameB = b.cells[0].querySelector('input').value.toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+      while (table.rows.length > 1) table.deleteRow(1);
+      rows.forEach(row => table.appendChild(row));
+      updateCalculations();
+      saveState();
+    }
+
+    function updateCalculations() {
+      const table = document.getElementById('grilleTable');
+      const rows = table.rows;
+      let totalCurrentAirflow = 0;
+      let totalCorrectedAirflow = 0;
+      let totalRequiredAirflow = 0;
+      let changes = [];
+      let grilles = [];
+
+      const useCorrectionFactor = document.getElementById('useCorrectionFactor').checked;
+      const correctionFactor = useCorrectionFactor ? (parseFloat(document.getElementById('correctionFactor').value) || 1.0) : 1.0;
+
+      for (let i = 1; i < rows.length; i++) {
+        const label = rows[i].cells[0].querySelector('input').value;
+        const required = parseFloat(rows[i].cells[1].querySelector('input').value) || 0;
+        const current = parseFloat(rows[i].cells[2].querySelector('input').value) || 0;
+        const corrected = current * correctionFactor;
+        const currentDamperIndex = useCorrectionFactor ? 4 : 3;
+        const currentDamper = parseFloat(rows[i].cells[currentDamperIndex].querySelector('input').value) || 100;
+
+        totalCurrentAirflow += current;
+        totalCorrectedAirflow += corrected;
+        totalRequiredAirflow += required;
+
+        grilles.push({ label, required, current, corrected, currentDamper, index: i });
+        if (useCorrectionFactor) rows[i].cells[3].textContent = corrected.toFixed(2);
+      }
+
+      const currentFanSpeed = parseFloat(document.getElementById('fanSpeed').value) || 50;
+      const recommendedFanSpeed = Math.round((totalRequiredAirflow / (useCorrectionFactor ? totalCorrectedAirflow : totalCurrentAirflow)) * currentFanSpeed);
+      const fanSpeedRatio = recommendedFanSpeed / currentFanSpeed;
+
+      const recommendedFanSpeedElement = document.getElementById('recommendedFanSpeed');
+      recommendedFanSpeedElement.textContent = `${recommendedFanSpeed}%`;
+      recommendedFanSpeedElement.classList.toggle('needs-change', recommendedFanSpeed !== currentFanSpeed);
+
+      for (let grille of grilles) {
+        let projectedAirflow = (useCorrectionFactor ? grille.corrected : grille.current) * fanSpeedRatio;
+        let recommendedDamper = grille.currentDamper;
+
+        if (projectedAirflow > grille.required) recommendedDamper = Math.round((grille.required / projectedAirflow) * grille.currentDamper);
+        else if (projectedAirflow < grille.required) recommendedDamper = Math.min(100, Math.round((grille.required / projectedAirflow) * grille.currentDamper));
+
+        recommendedDamper = Math.max(0, Math.min(100, recommendedDamper));
+
+        const recDamperIndex = useCorrectionFactor ? 5 : 4;
+        const percentIndex = useCorrectionFactor ? 6 : 5;
+
+        const recCell = rows[grille.index].cells[recDamperIndex];
+        recCell.innerHTML = `<span>${recommendedDamper}%</span>`;
+        recCell.classList.toggle('highlight', recommendedDamper !== grille.currentDamper);
+
+        const percentageOfTotal = ((useCorrectionFactor ? grille.corrected : grille.current) / (useCorrectionFactor ? totalCorrectedAirflow : totalCurrentAirflow)) * 100;
+        rows[grille.index].cells[percentIndex].textContent = `${percentageOfTotal.toFixed(2)}%`;
+
+        if (recommendedDamper !== grille.currentDamper) changes.push(`Adjust grille ${grille.label} damper from ${grille.currentDamper}% to ${recommendedDamper}%`);
+      }
+
+      document.getElementById('totalAirflow').textContent = totalCurrentAirflow.toFixed(2);
+      document.getElementById('totalCorrectedAirflow').textContent = totalCorrectedAirflow.toFixed(2);
+      document.getElementById('totalRequiredAirflow').textContent = totalRequiredAirflow.toFixed(2);
+      document.getElementById('percentageRequiredAirflow').textContent = `${((useCorrectionFactor ? totalCorrectedAirflow : totalCurrentAirflow) / totalRequiredAirflow * 100).toFixed(2)}%`;
+      document.getElementById('averageAirflow').textContent = ((useCorrectionFactor ? totalCorrectedAirflow : totalCurrentAirflow) / (rows.length - 1)).toFixed(2);
+
+      let summary = '';
+      if (recommendedFanSpeed !== currentFanSpeed) summary += `Adjust fan speed from ${currentFanSpeed}% to ${recommendedFanSpeed}%\n`;
+      summary += changes.join('\n');
+      document.getElementById('summary').textContent = summary;
+
+      saveState();
+    }
+
+    window.onload = loadState;
+  </script>
+</body>
+</html>
