@@ -147,10 +147,10 @@ table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 /* Column widths — tuned for ~390px portrait */
 col.c-idx  { width: 28px; }
 col.c-name { width: auto; }   /* fills remaining */
-col.c-req  { width: 64px; }
-col.c-cur  { width: 64px; }
-col.c-damp { width: 58px; }
-col.c-rec  { width: 58px; }
+col.c-req  { width: 68px; }
+col.c-cur  { width: 68px; }
+col.c-damp { width: 52px; }
+col.c-rec  { width: 52px; }
 col.c-del  { width: 30px; }
 
 thead { position: sticky; top: 0; z-index: 10; background: var(--surface2); }
@@ -272,7 +272,6 @@ tfoot td {
 <body>
 <div class="shell">
 
-  <!-- TOP BAR -->
   <div class="topbar">
     <div class="brand">
       🌬
@@ -286,7 +285,6 @@ tfoot td {
     </div>
   </div>
 
-  <!-- SETTINGS BAR -->
   <div class="settingsbar">
     <div class="sb-field">
       <span class="sb-label">System</span>
@@ -300,11 +298,11 @@ tfoot td {
       <span class="rec-label">Rec Spd</span>
       <span class="rec-val" id="recSpeed">—</span>
     </div>
-    <label class="cf-wrap" title="Correction Factor — multiplies Required Flow">
-      <input type="checkbox" id="useCF" onchange="toggleCF()">
+    <label class="cf-wrap" title="Correction Factor">
+      <input type="checkbox" id="useCF" onchange="onViewChange()">
       <div class="pill"></div>
       <span class="cf-lbl">CF</span>
-      <input class="sb-input cf" id="cfVal" type="number" min="0.01" step="0.01" value="1.0" inputmode="decimal" oninput="recalc()">
+      <input class="sb-input cf" id="cfVal" type="number" min="0.01" step="0.01" value="1.0" inputmode="decimal" oninput="onViewChange()">
     </label>
     <div class="sb-field" style="margin-left:auto; border-right:none; border-left:1px solid var(--border)">
       <button class="btn p" onclick="addRow()" style="padding:5px 12px">+ Grille</button>
@@ -312,18 +310,17 @@ tfoot td {
     </div>
   </div>
 
-  <!-- STATS -->
   <div class="statsbar">
     <div class="stat">
       <span class="sl">Count</span>
       <span class="sv hi" id="st-n">0</span>
     </div>
     <div class="stat">
-      <span class="sl">Cur Flow</span>
+      <span class="sl" id="st-cur-lbl">Actual Flow</span>
       <span class="sv" id="st-cur">—</span>
     </div>
     <div class="stat">
-      <span class="sl" id="st-req-lbl">Req Flow</span>
+      <span class="sl" id="st-req-lbl">Design Req</span>
       <span class="sv" id="st-req">—</span>
     </div>
     <div class="stat">
@@ -332,7 +329,6 @@ tfoot td {
     </div>
   </div>
 
-  <!-- TABLE -->
   <div class="table-wrap">
     <table>
       <colgroup>
@@ -348,8 +344,8 @@ tfoot td {
         <tr>
           <th class="left">#</th>
           <th class="left">Grille</th>
-          <th id="th-req">Req</th>
-          <th>Cur</th>
+          <th id="th-req">Req (Design)</th>
+          <th id="th-cur">Actual Flow</th>
           <th>Damp%</th>
           <th>Rec%</th>
           <th></th>
@@ -368,7 +364,6 @@ tfoot td {
     </table>
   </div>
 
-  <!-- SUMMARY -->
   <div class="sumbar" id="sumbar">
     <span class="sum-lbl">Actions</span>
     <span class="chip chip-ok">✓ Enter data to begin</span>
@@ -379,6 +374,11 @@ tfoot td {
 let rowCount = 0;
 let rowIds = [];
 
+// ── UTILITIES ─────────────────────────────────────────
+function fmt(n) { return n % 1 === 0 ? n.toFixed(0) : n.toFixed(1); }
+function fmtDec(n) { return Math.round(n * 100) / 100; }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
 // ── SYSTEM NAME ───────────────────────────────────────
 function onSysName() {
   const v = document.getElementById('fanName').value;
@@ -386,43 +386,86 @@ function onSysName() {
   saveState();
 }
 
-// ── CORRECTION FACTOR ─────────────────────────────────
-function toggleCF() {
-  const on = document.getElementById('useCF').checked;
-  document.getElementById('cfVal').style.display = on ? 'inline-block' : 'none';
-  // Update header to show CF is applied to Req
-  document.getElementById('th-req').textContent = on ? 'Req×CF' : 'Req';
-  recalc(); saveState();
+// ── CORRECTION FACTOR VIEWS ───────────────────────────
+function onViewChange() {
+  const useCF = document.getElementById('useCF').checked;
+  const cf = parseFloat(document.getElementById('cfVal').value) || 1;
+
+  document.getElementById('cfVal').style.display = useCF ? 'inline-block' : 'none';
+  document.getElementById('th-req').textContent = useCF ? 'Target (Req/CF)' : 'Req (Design)';
+  document.getElementById('th-cur').textContent = useCF ? 'Raw Hood' : 'Actual (Cur×CF)';
+
+  rowIds.forEach(id => {
+    const reqEl = document.getElementById(`rreq-${id}`);
+    const curEl = document.getElementById(`rcur-${id}`);
+
+    const rawReq = parseFloat(reqEl.dataset.rawreq);
+    const rawCur = parseFloat(curEl.dataset.rawcur);
+
+    if (!isNaN(rawReq)) reqEl.value = useCF ? fmtDec(rawReq / cf) : fmtDec(rawReq);
+    if (!isNaN(rawCur)) curEl.value = useCF ? fmtDec(rawCur) : fmtDec(rawCur * cf);
+  });
+
+  recalc();
+}
+
+// ── CELL INPUT HANDLER ────────────────────────────────
+function onCellInput(id, field) {
+  const useCF = document.getElementById('useCF').checked;
+  const cf = parseFloat(document.getElementById('cfVal').value) || 1;
+  const inputEl = document.getElementById(`r${field}-${id}`);
+  const valText = inputEl.value;
+
+  if (valText === '') {
+    inputEl.dataset[`raw${field}`] = '';
+  } else {
+    const val = parseFloat(valText);
+    if (field === 'req') {
+      inputEl.dataset.rawreq = useCF ? (val * cf) : val;
+    } else if (field === 'cur') {
+      inputEl.dataset.rawcur = useCF ? val : (val / cf);
+    }
+  }
+  recalc();
 }
 
 // ── ADD ROW ───────────────────────────────────────────
-function addRow(name='', req='', cur='', damp='100') {
+function addRow(name='', rawReq='', rawCur='', damp='100') {
   rowCount++;
   const id = rowCount;
   rowIds.push(id);
   document.getElementById('emptyRow').style.display = 'none';
+
+  const useCF = document.getElementById('useCF').checked;
+  const cf = parseFloat(document.getElementById('cfVal').value) || 1;
+
+  let dispReq = rawReq;
+  let dispCur = rawCur;
+
+  if (rawReq !== '') dispReq = useCF ? fmtDec(Number(rawReq) / cf) : fmtDec(Number(rawReq));
+  if (rawCur !== '') dispCur = useCF ? fmtDec(Number(rawCur)) : fmtDec(Number(rawCur) * cf);
 
   const tr = document.createElement('tr');
   tr.id = 'row-' + id;
   tr.innerHTML = `
     <td class="idx" id="idx-${id}">${rowIds.length}</td>
     <td><input class="ci" id="rname-${id}" type="text" placeholder="G${rowIds.length}" value="${esc(name)}" oninput="recalc()"></td>
-    <td><input class="ci" id="rreq-${id}" type="number" min="0" step="any" inputmode="decimal" value="${req}" oninput="recalc()"></td>
-    <td><input class="ci" id="rcur-${id}" type="number" min="0" step="any" inputmode="decimal" value="${cur}" oninput="recalc()"></td>
+    <td><input class="ci" id="rreq-${id}" data-rawreq="${rawReq}" type="number" min="0" step="any" inputmode="decimal" value="${dispReq}" oninput="onCellInput(${id}, 'req')"></td>
+    <td><input class="ci" id="rcur-${id}" data-rawcur="${rawCur}" type="number" min="0" step="any" inputmode="decimal" value="${dispCur}" oninput="onCellInput(${id}, 'cur')"></td>
     <td><input class="ci" id="rdamp-${id}" type="number" min="0" max="100" inputmode="decimal" value="${damp}" oninput="recalc()"></td>
     <td><span class="rd empty" id="rrec-${id}">—</span></td>
     <td><button class="db" onclick="removeRow(${id})">×</button></td>
   `;
   document.getElementById('tbody').appendChild(tr);
   if (!name) setTimeout(() => document.getElementById('rname-' + id)?.focus(), 30);
-  recalc(); saveState();
+  recalc(); 
 }
 
 function removeRow(id) {
   rowIds = rowIds.filter(i => i !== id);
   document.getElementById('row-' + id)?.remove();
   if (!rowIds.length) document.getElementById('emptyRow').style.display = '';
-  renumber(); recalc(); saveState();
+  renumber(); recalc();
 }
 
 function renumber() {
@@ -446,43 +489,45 @@ function clearAll() {
 function sortRows() {
   const data = rowIds.map(id => ({
     name: document.getElementById('rname-' + id)?.value ?? '',
-    req:  document.getElementById('rreq-' + id)?.value ?? '',
-    cur:  document.getElementById('rcur-' + id)?.value ?? '',
+    rawReq: document.getElementById('rreq-' + id)?.dataset.rawreq ?? '',
+    rawCur: document.getElementById('rcur-' + id)?.dataset.rawcur ?? '',
     damp: document.getElementById('rdamp-' + id)?.value ?? '100',
   }));
   data.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
   rowIds.forEach(id => document.getElementById('row-' + id)?.remove());
   rowIds = []; rowCount = 0;
   document.getElementById('emptyRow').style.display = 'none';
-  data.forEach(d => addRow(d.name, d.req, d.cur, d.damp));
+  data.forEach(d => addRow(d.name, d.rawReq, d.rawCur, d.damp));
 }
 
 // ── RECALCULATE ───────────────────────────────────────
 function recalc() {
   const useCF = document.getElementById('useCF').checked;
-  const cf = useCF ? (parseFloat(document.getElementById('cfVal').value) || 1) : 1;
+  const cf = parseFloat(document.getElementById('cfVal').value) || 1;
 
-  let totCur = 0, totReqAdj = 0;
+  let totRawReq = 0, totRawCur = 0;
   const rows = rowIds.map(id => {
-    const cur  = parseFloat(document.getElementById('rcur-' + id)?.value)  || 0;
-    const req  = parseFloat(document.getElementById('rreq-' + id)?.value)  || 0;
-    const damp = parseFloat(document.getElementById('rdamp-' + id)?.value) || 100;
-    const reqAdj = req * cf;  // CF applied to required flow
-    totCur    += cur;
-    totReqAdj += reqAdj;
-    return { id, cur, req, reqAdj, damp };
+    const rawReq = parseFloat(document.getElementById('rreq-' + id)?.dataset.rawreq) || 0;
+    const rawCur = parseFloat(document.getElementById('rcur-' + id)?.dataset.rawcur) || 0;
+    const damp   = parseFloat(document.getElementById('rdamp-' + id)?.value) || 100;
+    
+    totRawReq += rawReq;
+    totRawCur += rawCur;
+    
+    return { id, rawReq, rawCur, damp };
   });
 
-  // Fan speed recommendation: scale fan so total current = total adjusted required
+  const actualCurSum = totRawCur * cf;
   const curSpeed = parseFloat(document.getElementById('fanSpeed').value) || 0;
   let recSpeed = 0, ratio = 1;
-  if (totCur > 0 && totReqAdj > 0 && curSpeed > 0) {
-    recSpeed = Math.max(0, Math.min(100, Math.round((totReqAdj / totCur) * curSpeed)));
+
+  if (actualCurSum > 0 && totRawReq > 0 && curSpeed > 0) {
+    recSpeed = Math.max(0, Math.min(100, Math.round((totRawReq / actualCurSum) * curSpeed)));
     ratio = recSpeed / curSpeed;
   }
 
   const rsEl = document.getElementById('recSpeed');
-  if (totCur > 0 && curSpeed > 0) {
+  if (actualCurSum > 0 && curSpeed > 0) {
     rsEl.textContent = recSpeed + '%';
     rsEl.className = 'rec-val ' + (recSpeed === curSpeed ? 'ok' : 'changed');
   } else {
@@ -490,21 +535,19 @@ function recalc() {
     rsEl.className = 'rec-val';
   }
 
-  // Per-row
   const actions = [];
-  if (recSpeed !== curSpeed && totCur > 0 && curSpeed > 0)
+  if (recSpeed !== curSpeed && actualCurSum > 0 && curSpeed > 0)
     actions.push({ type: 'fan', text: `Fan ${curSpeed}% → ${recSpeed}%` });
 
   rows.forEach(r => {
-    // Project current flow at new fan speed, compare to adjusted required
-    const proj = r.cur * ratio;
+    const projActual = r.rawCur * cf * ratio;
     let recD = r.damp;
-    if (proj > 0 && r.reqAdj > 0)
-      recD = Math.max(0, Math.min(100, Math.round((r.reqAdj / proj) * r.damp)));
+    if (projActual > 0 && r.rawReq > 0)
+      recD = Math.max(0, Math.min(100, Math.round((r.rawReq / projActual) * r.damp)));
 
     const el = document.getElementById('rrec-' + r.id);
     if (el) {
-      if (proj > 0 && r.reqAdj > 0) {
+      if (projActual > 0 && r.rawReq > 0) {
         el.textContent = recD + '%';
         el.className = 'rd ' + (recD !== r.damp ? 'changed' : 'ok');
       } else {
@@ -513,22 +556,31 @@ function recalc() {
       }
     }
 
-    if (recD !== r.damp && proj > 0 && r.reqAdj > 0) {
+    if (recD !== r.damp && projActual > 0 && r.rawReq > 0) {
       const nm = document.getElementById('rname-' + r.id)?.value || ('#' + r.id);
       actions.push({ type: 'damp', text: `${nm}: ${r.damp}%→${recD}%` });
     }
   });
 
-  // Stats
+  // Stats update based on Current View
   const n = rowIds.length;
-  document.getElementById('st-n').textContent   = n;
-  document.getElementById('st-cur').textContent = n ? fmt(totCur)    : '—';
-  document.getElementById('st-req').textContent = n ? fmt(totReqAdj) : '—';
-  document.getElementById('st-req-lbl').textContent = useCF ? 'Req×CF' : 'Req Flow';
+  document.getElementById('st-n').textContent = n;
+
+  if (useCF) {
+    document.getElementById('st-req-lbl').textContent = 'Target Sum';
+    document.getElementById('st-cur-lbl').textContent = 'Raw Hood';
+    document.getElementById('st-req').textContent = n ? fmt(totRawReq / cf) : '—';
+    document.getElementById('st-cur').textContent = n ? fmt(totRawCur) : '—';
+  } else {
+    document.getElementById('st-req-lbl').textContent = 'Design Sum';
+    document.getElementById('st-cur-lbl').textContent = 'Actual Flow';
+    document.getElementById('st-req').textContent = n ? fmt(totRawReq) : '—';
+    document.getElementById('st-cur').textContent = n ? fmt(actualCurSum) : '—';
+  }
 
   const pctEl = document.getElementById('st-pct');
-  if (n && totReqAdj > 0) {
-    const pct = totCur / totReqAdj * 100;
+  if (n && totRawReq > 0) {
+    const pct = (actualCurSum / totRawReq) * 100;
     pctEl.textContent = pct.toFixed(1) + '%';
     pctEl.className = 'sv ' + (Math.abs(pct - 100) < 5 ? 'ok' : 'warn');
   } else {
@@ -558,19 +610,16 @@ function saveState() {
     useCF:    document.getElementById('useCF').checked,
     cfVal:    document.getElementById('cfVal').value,
     rows: rowIds.map(id => ({
-      name: document.getElementById('rname-' + id)?.value ?? '',
-      req:  document.getElementById('rreq-' + id)?.value ?? '',
-      cur:  document.getElementById('rcur-' + id)?.value ?? '',
-      damp: document.getElementById('rdamp-' + id)?.value ?? '100',
+      name:   document.getElementById('rname-' + id)?.value ?? '',
+      rawReq: document.getElementById('rreq-' + id)?.dataset.rawreq ?? '',
+      rawCur: document.getElementById('rcur-' + id)?.dataset.rawcur ?? '',
+      damp:   document.getElementById('rdamp-' + id)?.value ?? '100',
     }))
   }));
 }
 
 function loadState() {
-  const raw = localStorage.getItem('aft4')
-    || localStorage.getItem('aft3')
-    || localStorage.getItem('airflowToolState2')
-    || localStorage.getItem('airflowToolState');
+  const raw = localStorage.getItem('aft4') || localStorage.getItem('aft3');
   if (!raw) { recalc(); return; }
   try {
     const s = JSON.parse(raw);
@@ -579,10 +628,16 @@ function loadState() {
     document.getElementById('useCF').checked  = !!s.useCF;
     document.getElementById('cfVal').value    = s.cfVal    || 1.0;
     onSysName();
-    if (s.useCF) toggleCF();
-    (s.rows || s.grilles || []).forEach(r =>
-      addRow(r.name || r.label || '', r.req || r.required || '', r.cur || r.current || '', r.damp || r.damper || '100')
-    );
+
+    document.getElementById('cfVal').style.display = s.useCF ? 'inline-block' : 'none';
+    document.getElementById('th-req').textContent = s.useCF ? 'Target (Req/CF)' : 'Req (Design)';
+    document.getElementById('th-cur').textContent = s.useCF ? 'Raw Hood' : 'Actual (Cur×CF)';
+
+    (s.rows || s.grilles || []).forEach(r => {
+      const rawReq = r.rawReq !== undefined ? r.rawReq : (r.req || r.required || '');
+      const rawCur = r.rawCur !== undefined ? r.rawCur : (r.cur || r.current || '');
+      addRow(r.name || r.label || '', rawReq, rawCur, r.damp || r.damper || '100');
+    });
   } catch(e) { console.warn('load failed', e); }
   recalc();
 }
@@ -595,45 +650,52 @@ function exportCSV() {
   const speed   = document.getElementById('fanSpeed').value;
   const date    = new Date().toLocaleDateString();
 
-  let totCur = 0, totReqAdj = 0;
+  let totRawReq = 0, totRawCur = 0;
   const data = rowIds.map((id, i) => {
     const name = document.getElementById('rname-' + id)?.value || '';
-    const req  = parseFloat(document.getElementById('rreq-' + id)?.value)  || 0;
-    const cur  = parseFloat(document.getElementById('rcur-' + id)?.value)  || 0;
     const damp = parseFloat(document.getElementById('rdamp-' + id)?.value) || 100;
-    const reqAdj = req * cf;
-    totCur += cur; totReqAdj += reqAdj;
-    return { i: i+1, name, req, reqAdj, cur, damp };
+    const rawReq = parseFloat(document.getElementById('rreq-' + id)?.dataset.rawreq) || 0;
+    const rawCur = parseFloat(document.getElementById('rcur-' + id)?.dataset.rawcur) || 0;
+    
+    totRawReq += rawReq;
+    totRawCur += rawCur;
+    
+    return { i: i+1, name, rawReq, rawCur, damp };
   });
 
+  const actualCurSum = totRawCur * cf;
   const curSpeed = parseFloat(speed) || 0;
   let recSpeed = 0, ratio = 1;
-  if (totCur > 0 && totReqAdj > 0 && curSpeed > 0) {
-    recSpeed = Math.max(0, Math.min(100, Math.round((totReqAdj / totCur) * curSpeed)));
+  
+  if (actualCurSum > 0 && totRawReq > 0 && curSpeed > 0) {
+    recSpeed = Math.max(0, Math.min(100, Math.round((totRawReq / actualCurSum) * curSpeed)));
     ratio = recSpeed / curSpeed;
   }
 
-  const cfHdr = useCF ? `Req Flow (×${cf})` : 'Req Flow';
-  const headers = ['#','Grille', cfHdr,'Cur Flow','Cur Damp%','Rec Damp%'];
-  if (useCF) headers.splice(2, 0, 'Req Flow (raw)');
+  const headers = ['#','Grille','Design Flow','Target Hood','Raw Hood','Actual Flow','Cur Damp%','Rec Damp%'];
 
   const csvRows = [
     [`Airflow Balancing Report — ${sysName} — ${date}`],
-    [`Fan Speed: ${speed}%`, `Recommended: ${recSpeed}%`, useCF ? `Correction Factor: ${cf}` : ''].filter(Boolean),
+    [`Fan Speed: ${speed}%`, `Recommended: ${recSpeed}%`, `Correction Factor: ${cf}`],
     [],
     headers,
     ...data.map(r => {
-      const proj = r.cur * ratio;
+      const projActual = r.rawCur * cf * ratio;
       let recD = r.damp;
-      if (proj > 0 && r.reqAdj > 0) recD = Math.max(0, Math.min(100, Math.round((r.reqAdj / proj) * r.damp)));
-      const row = [r.i, r.name, r.reqAdj.toFixed(1), r.cur, r.damp + '%', recD + '%'];
-      if (useCF) row.splice(2, 0, r.req);
-      return row;
+      if (projActual > 0 && r.rawReq > 0) recD = Math.max(0, Math.min(100, Math.round((r.rawReq / projActual) * r.damp)));
+      
+      return [
+        r.i, r.name, 
+        r.rawReq, 
+        fmtDec(r.rawReq / cf), 
+        r.rawCur, 
+        fmtDec(r.rawCur * cf), 
+        r.damp + '%', recD + '%'
+      ];
     }),
     [],
-    ['Totals', '', fmt(totReqAdj), fmt(totCur)],
-    useCF ? ['Raw Totals', '', '', ''] : [],
-  ].filter(r => r.length);
+    ['Totals', '', fmt(totRawReq), fmtDec(totRawReq/cf), fmt(totRawCur), fmt(actualCurSum)]
+  ];
 
   const csv = csvRows.map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
@@ -641,9 +703,6 @@ function exportCSV() {
   a.download = `airflow-${sysName.replace(/\s+/g,'-').toLowerCase()}-${date.replace(/\//g,'-')}.csv`;
   a.click();
 }
-
-function fmt(n) { return n % 1 === 0 ? n.toFixed(0) : n.toFixed(1); }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 window.onload = loadState;
 </script>
