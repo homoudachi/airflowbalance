@@ -4,428 +4,331 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Airflow Balancing Tool</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #0f1117;
-  --surface: #181c27;
+  --bg:       #0f1117;
+  --surface:  #181c27;
   --surface2: #1e2330;
-  --border: #2a2f3f;
-  --border2: #3a3f52;
-  --text: #e8eaf0;
-  --text-dim: #8890a8;
-  --text-muted: #555e78;
-  --accent: #3b82f6;
-  --accent-dim: #1e3a6e;
-  --warn: #f59e0b;
-  --warn-dim: #3d2e0a;
-  --ok: #22c55e;
-  --ok-dim: #0c2e18;
-  --danger: #ef4444;
-  --mono: 'JetBrains Mono', monospace;
-  --sans: 'Sora', sans-serif;
-  --row-h: 34px;
+  --border:   #2a2f3f;
+  --border2:  #3a3f52;
+  --text:     #e8eaf0;
+  --dim:      #8890a8;
+  --muted:    #555e78;
+  --accent:   #3b82f6;
+  --adim:     #1a3464;
+  --warn:     #f59e0b;
+  --wdim:     #3d2e0a;
+  --ok:       #22c55e;
+  --okdim:    #0c2e18;
+  --danger:   #ef4444;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Sora', sans-serif;
+  --rh:       38px;   /* row height */
 }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 13px; overflow: hidden; }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── SHELL ── */
+.shell { display: flex; flex-direction: column; height: 100dvh; }
 
-html, body {
-  height: 100%;
-  font-family: var(--mono);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 13px;
-  overflow-x: hidden;
-}
-
-.shell {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  max-height: 100vh;
-}
-
-/* TOPBAR */
+/* ── TOPBAR ── */
 .topbar {
   flex-shrink: 0;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  height: 44px;
-  overflow-x: auto;
-}
-.topbar-brand {
-  padding: 0 14px;
-  border-right: 1px solid var(--border);
-  height: 100%;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.brand-name {
-  font-family: var(--sans);
-  font-size: 13px;
-  font-weight: 600;
-}
-.tb-field {
-  display: flex;
-  align-items: center;
-  height: 100%;
   padding: 0 10px;
-  border-right: 1px solid var(--border);
-  gap: 6px;
-  white-space: nowrap;
-  flex-shrink: 0;
+  height: 46px;
+  gap: 8px;
 }
-.tb-label {
-  font-size: 10px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.brand {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--sans); font-size: 14px; font-weight: 700;
+  white-space: nowrap; overflow: hidden;
 }
-.tb-input {
-  background: transparent;
-  border: none;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 500;
-  width: 110px;
-  outline: none;
+.brand-sub {
+  font-family: var(--mono); font-size: 11px; font-weight: 400;
+  color: var(--muted); border-left: 1px solid var(--border2);
+  padding-left: 8px; margin-left: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.tb-input.narrow { width: 44px; text-align: center; }
-.tb-input:focus { color: var(--accent); }
+.top-actions { display: flex; gap: 5px; }
 
-.rec-speed-wrap {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 0 12px;
-  border-right: 1px solid var(--border);
-  height: 100%;
-  gap: 1px;
+/* ── SETTINGS BAR ── */
+.settingsbar {
   flex-shrink: 0;
-}
-.rec-speed-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.rec-speed-val { font-size: 14px; font-weight: 700; color: var(--text-dim); }
-.rec-speed-val.changed { color: var(--warn); }
-.rec-speed-val.ok { color: var(--ok); }
-
-.cf-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border-right: 1px solid var(--border);
-  height: 100%;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.cf-toggle input[type=checkbox] { display: none; }
-.cf-pill {
-  width: 28px; height: 15px;
-  background: var(--border2);
-  border-radius: 8px;
-  position: relative;
-  transition: background 0.15s;
-  flex-shrink: 0;
-}
-.cf-pill::after {
-  content: '';
-  position: absolute;
-  width: 11px; height: 11px;
-  background: var(--text-muted);
-  border-radius: 50%;
-  top: 2px; left: 2px;
-  transition: transform 0.15s, background 0.15s;
-}
-input:checked ~ .cf-pill { background: var(--accent-dim); }
-input:checked ~ .cf-pill::after { transform: translateX(13px); background: var(--accent); }
-.cf-label { font-size: 11px; color: var(--text-muted); }
-.cf-num {
-  background: var(--surface2);
-  border: 1px solid var(--border2);
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 12px;
-  width: 50px;
-  padding: 2px 4px;
-  border-radius: 3px;
-  text-align: center;
-  outline: none;
-  display: none;
-}
-.cf-num:focus { border-color: var(--accent); }
-
-.topbar-actions {
-  display: flex;
-  align-items: center;
-  height: 100%;
-  padding: 0 8px;
-  gap: 4px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-/* BUTTONS */
-.btn {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 5px 10px;
-  border-radius: 4px;
-  border: 1px solid var(--border2);
-  cursor: pointer;
-  background: var(--surface2);
-  color: var(--text-dim);
-  transition: all 0.12s;
-  white-space: nowrap;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-.btn:hover { color: var(--text); background: var(--surface); }
-.btn:active { opacity: 0.7; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
-.btn.primary:hover { background: #2563eb; }
-.btn.ghost-danger { color: var(--danger); border-color: transparent; background: transparent; }
-
-/* STATS BAR */
-.statsbar {
-  flex-shrink: 0;
-  display: flex;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 40px;
   overflow-x: auto;
+  scrollbar-width: none;
+}
+.settingsbar::-webkit-scrollbar { display: none; }
+.sb-field {
+  display: flex; align-items: center; gap: 5px;
+  padding: 0 10px; height: 100%;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sb-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+.sb-input {
+  background: transparent; border: none;
+  color: var(--text); font-family: var(--mono); font-size: 13px; font-weight: 500;
+  outline: none; min-width: 0;
+}
+.sb-input.sys { width: 100px; }
+.sb-input.spd { width: 36px; text-align: center; }
+.sb-input.cf  { width: 42px; text-align: center; display: none; }
+.sb-input:focus { color: var(--accent); }
+
+/* rec speed */
+.rec-box {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 0 10px; height: 100%; border-right: 1px solid var(--border);
+  flex-shrink: 0; gap: 0px;
+}
+.rec-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.rec-val { font-size: 16px; font-weight: 700; color: var(--dim); line-height: 1; }
+.rec-val.changed { color: var(--warn); }
+.rec-val.ok      { color: var(--ok); }
+
+/* cf toggle */
+.cf-wrap {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 10px; height: 100%; border-right: 1px solid var(--border);
+  cursor: pointer; flex-shrink: 0;
+}
+.cf-wrap input[type=checkbox] { display: none; }
+.pill {
+  width: 28px; height: 15px; background: var(--border2);
+  border-radius: 8px; position: relative; transition: background .15s; flex-shrink: 0;
+}
+.pill::after {
+  content: ''; position: absolute;
+  width: 11px; height: 11px; background: var(--muted);
+  border-radius: 50%; top: 2px; left: 2px;
+  transition: transform .15s, background .15s;
+}
+input:checked ~ .pill { background: var(--adim); }
+input:checked ~ .pill::after { transform: translateX(13px); background: var(--accent); }
+.cf-lbl { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* ── STATS BAR ── */
+.statsbar {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
 }
 .stat {
-  flex: 1;
-  min-width: 90px;
-  padding: 5px 12px;
+  padding: 5px 8px;
   border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  display: flex; flex-direction: column; gap: 1px;
 }
 .stat:last-child { border-right: none; }
-.stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
-.stat-value { font-size: 15px; font-weight: 700; color: var(--text-dim); font-variant-numeric: tabular-nums; }
-.stat-value.ok { color: var(--ok); }
-.stat-value.warn { color: var(--warn); }
-.stat-value.accent { color: var(--accent); }
+.sl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; }
+.sv { font-size: 14px; font-weight: 700; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sv.ok   { color: var(--ok); }
+.sv.warn { color: var(--warn); }
+.sv.hi   { color: var(--accent); }
 
-/* TABLE */
-.table-wrap {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
+/* ── TABLE ── */
+.table-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
 
-table {
-  width: 100%;
-  min-width: 540px;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 
-col.c-num  { width: 34px; }
-col.c-name { width: 130px; }
-col.c-num3 { width: 78px; }
-col.c-damp { width: 70px; }
-col.c-rdamp{ width: 70px; }
-col.c-pct  { width: 62px; }
-col.c-del  { width: 32px; }
+/* Column widths — tuned for ~390px portrait */
+col.c-idx  { width: 28px; }
+col.c-name { width: auto; }   /* fills remaining */
+col.c-req  { width: 64px; }
+col.c-cur  { width: 64px; }
+col.c-damp { width: 58px; }
+col.c-rec  { width: 58px; }
+col.c-del  { width: 30px; }
 
-thead {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--surface2);
-  border-bottom: 1px solid var(--border2);
-}
+thead { position: sticky; top: 0; z-index: 10; background: var(--surface2); }
 th {
-  padding: 0 7px;
-  height: 27px;
-  text-align: left;
-  font-size: 10px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--text-muted);
-  white-space: nowrap;
+  padding: 0 4px; height: 26px;
+  font-size: 9px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--muted);
+  border-bottom: 1px solid var(--border2);
   border-right: 1px solid var(--border);
+  white-space: nowrap; overflow: hidden;
+  text-align: right;
 }
+th.left { text-align: left; }
 th:last-child { border-right: none; }
 
-tbody tr {
-  border-bottom: 1px solid var(--border);
-  height: var(--row-h);
-}
+tbody tr { border-bottom: 1px solid var(--border); height: var(--rh); }
+tbody tr:nth-child(even) { background: rgba(255,255,255,0.018); }
 tbody tr:hover { background: var(--surface2); }
 
 td {
-  padding: 0 5px;
-  height: var(--row-h);
+  padding: 0 4px; height: var(--rh);
   border-right: 1px solid var(--border);
-  vertical-align: middle;
-  white-space: nowrap;
+  vertical-align: middle; overflow: hidden;
 }
 td:last-child { border-right: none; }
 
-.td-num { color: var(--text-muted); font-size: 10px; text-align: center; }
+.idx { text-align: center; color: var(--muted); font-size: 10px; }
 
-.cell-input {
-  background: transparent;
-  border: none;
-  color: var(--text);
-  font-family: var(--mono);
+.ci {
+  background: transparent; border: none;
+  color: var(--text); font-family: var(--mono); font-size: 14px;
+  width: 100%; height: 100%; outline: none; padding: 0 2px;
   font-size: 13px;
-  width: 100%;
-  height: 100%;
-  outline: none;
-  padding: 0 2px;
 }
-.cell-input:focus { background: var(--accent-dim); border-radius: 3px; }
-.cell-input[type="number"] { text-align: right; }
+.ci[type=number] { text-align: right; }
+.ci:focus { background: var(--adim); border-radius: 2px; }
 input[type=number]::-webkit-inner-spin-button { opacity: 0; }
 
-.rec-damper { font-weight: 700; font-size: 13px; text-align: right; display: block; }
-.rec-damper.changed { color: var(--warn); }
-.rec-damper.ok      { color: var(--ok); }
-.rec-damper.empty   { color: var(--text-muted); }
+/* result cells */
+.rd {
+  display: block; text-align: right;
+  font-weight: 700; font-size: 13px;
+}
+.rd.changed { color: var(--warn); }
+.rd.ok      { color: var(--ok); }
+.rd.empty   { color: var(--muted); font-weight: 400; }
 
-.pct-cell { color: var(--text-dim); text-align: right; font-size: 12px; display: block; }
-
-.del-btn {
-  background: none; border: none;
-  color: var(--text-muted);
-  cursor: pointer; font-size: 16px;
+.db { /* del button */
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 16px;
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
   touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
 }
-.del-btn:hover { color: var(--danger); }
+.db:hover { color: var(--danger); }
+
+.empty-row td {
+  text-align: center; color: var(--muted);
+  font-size: 12px; padding: 32px 0; border-right: none;
+}
 
 tfoot td {
-  padding: 6px 8px;
+  padding: 8px;
   background: var(--bg);
   border-top: 1px solid var(--border2);
   border-right: none;
 }
 
-/* SUMMARY */
-.summary-panel {
+/* ── SUMMARY BAR ── */
+.sumbar {
   flex-shrink: 0;
-  border-top: 1px solid var(--border);
   background: var(--surface);
-  max-height: 120px;
-  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  padding: 6px 10px;
+  display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
+  max-height: 110px; overflow-y: auto;
 }
-.summary-inner {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding: 7px 10px;
-  align-items: center;
-}
-.summary-label {
-  font-size: 10px; text-transform: uppercase;
-  letter-spacing: 0.07em; color: var(--text-muted);
-  margin-right: 2px; white-space: nowrap;
-}
+.sum-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-right: 2px; }
 .chip {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 3px 7px; border-radius: 3px;
-  font-size: 11px; font-weight: 500;
-  white-space: nowrap; border: 1px solid transparent;
+  font-size: 11px; font-weight: 500; white-space: nowrap;
+  border: 1px solid transparent;
 }
-.chip-fan  { background: var(--accent-dim); border-color: #2a4a8a; color: #93c5fd; }
-.chip-damp { background: var(--warn-dim); border-color: #5a3a08; color: #fcd34d; }
-.chip-ok   { background: var(--ok-dim); border-color: #0d4020; color: #86efac; }
+.chip-fan  { background: var(--adim); border-color: #2a4a8a; color: #93c5fd; }
+.chip-damp { background: var(--wdim); border-color: #5a3a08; color: #fcd34d; }
+.chip-ok   { background: var(--okdim); border-color: #0d4020; color: #86efac; }
 
-/* EMPTY */
-.empty-row td { text-align: center; color: var(--text-muted); font-size: 12px; padding: 30px; border-right: none; }
+/* ── BUTTONS ── */
+.btn {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  padding: 5px 9px; border-radius: 4px;
+  border: 1px solid var(--border2); cursor: pointer;
+  background: var(--surface2); color: var(--dim);
+  white-space: nowrap; touch-action: manipulation;
+  transition: color .1s, background .1s;
+}
+.btn:active { opacity: .7; }
+.btn.p { background: var(--accent); border-color: var(--accent); color: white; }
+.btn.d { color: var(--danger); border-color: transparent; background: transparent; padding: 5px 6px; }
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 
+/* ── PRINT ── */
 @media print {
-  .topbar-actions, tfoot, .del-btn { display: none !important; }
-  body, .shell { background: white; color: black; height: auto; }
+  body, .shell { background: white; color: black; height: auto; overflow: visible; }
+  .topbar, .top-actions, .cf-wrap, tfoot, .db, .btn { display: none !important; }
   .table-wrap { overflow: visible; }
-  .summary-panel { max-height: none; }
+  .sumbar { max-height: none; }
   th, td { color: black !important; border-color: #bbb !important; }
-  .rec-damper.changed { color: #b45309 !important; }
-  .rec-damper.ok { color: #166534 !important; }
+  .rd.changed { color: #b45309 !important; }
+  .rd.ok      { color: #166534 !important; }
 }
 </style>
 </head>
 <body>
 <div class="shell">
 
-  <!-- TOPBAR -->
+  <!-- TOP BAR -->
   <div class="topbar">
-    <div class="topbar-brand">
-      <span>🌬</span>
-      <span class="brand-name">Airflow Balancer</span>
+    <div class="brand">
+      🌬
+      <span id="brandName">Airflow Balancer</span>
+      <span class="brand-sub" id="brandSub">no system</span>
     </div>
-    <div class="tb-field">
-      <span class="tb-label">System</span>
-      <input class="tb-input" id="fanName" type="text" placeholder="AHU-01" oninput="saveState()">
-    </div>
-    <div class="tb-field">
-      <span class="tb-label">Speed %</span>
-      <input class="tb-input narrow" id="fanSpeed" type="number" min="0" max="100" value="50" oninput="recalc()">
-    </div>
-    <div class="rec-speed-wrap">
-      <span class="rec-speed-label">Rec. Speed</span>
-      <span class="rec-speed-val" id="recSpeed">—</span>
-    </div>
-    <label class="cf-toggle" title="Correction Factor">
-      <input type="checkbox" id="useCF" onchange="toggleCF()">
-      <div class="cf-pill"></div>
-      <span class="cf-label">CF</span>
-      <input class="cf-num" id="cfVal" type="number" min="0.01" step="0.01" value="1.0" oninput="recalc()">
-    </label>
-    <div class="topbar-actions">
-      <button class="btn primary" onclick="addRow()">+ Grille</button>
-      <button class="btn" onclick="sortRows()">↕ Sort</button>
+    <div class="top-actions">
       <button class="btn" onclick="exportCSV()">⬇ CSV</button>
-      <button class="btn" onclick="window.print()">⎙ PDF</button>
-      <button class="btn ghost-danger" onclick="clearAll()">✕</button>
+      <button class="btn" onclick="window.print()">⎙</button>
+      <button class="btn d" onclick="clearAll()">✕</button>
     </div>
   </div>
 
-  <!-- STATS BAR -->
+  <!-- SETTINGS BAR -->
+  <div class="settingsbar">
+    <div class="sb-field">
+      <span class="sb-label">System</span>
+      <input class="sb-input sys" id="fanName" type="text" placeholder="AHU-01" oninput="onSysName()">
+    </div>
+    <div class="sb-field">
+      <span class="sb-label">Spd%</span>
+      <input class="sb-input spd" id="fanSpeed" type="number" min="0" max="100" value="50" inputmode="numeric" oninput="recalc()">
+    </div>
+    <div class="rec-box">
+      <span class="rec-label">Rec Spd</span>
+      <span class="rec-val" id="recSpeed">—</span>
+    </div>
+    <label class="cf-wrap" title="Correction Factor — multiplies Required Flow">
+      <input type="checkbox" id="useCF" onchange="toggleCF()">
+      <div class="pill"></div>
+      <span class="cf-lbl">CF</span>
+      <input class="sb-input cf" id="cfVal" type="number" min="0.01" step="0.01" value="1.0" inputmode="decimal" oninput="recalc()">
+    </label>
+    <div class="sb-field" style="margin-left:auto; border-right:none; border-left:1px solid var(--border)">
+      <button class="btn p" onclick="addRow()" style="padding:5px 12px">+ Grille</button>
+      <button class="btn" onclick="sortRows()" style="margin-left:3px">↕</button>
+    </div>
+  </div>
+
+  <!-- STATS -->
   <div class="statsbar">
     <div class="stat">
-      <span class="stat-label">Grilles</span>
-      <span class="stat-value accent" id="st-count">0</span>
+      <span class="sl">Count</span>
+      <span class="sv hi" id="st-n">0</span>
     </div>
     <div class="stat">
-      <span class="stat-label">Cur Flow</span>
-      <span class="stat-value" id="st-cur">—</span>
-    </div>
-    <div class="stat" id="st-corr-box" style="display:none">
-      <span class="stat-label">Corr Flow</span>
-      <span class="stat-value" id="st-corr">—</span>
+      <span class="sl">Cur Flow</span>
+      <span class="sv" id="st-cur">—</span>
     </div>
     <div class="stat">
-      <span class="stat-label">Req Flow</span>
-      <span class="stat-value" id="st-req">—</span>
+      <span class="sl" id="st-req-lbl">Req Flow</span>
+      <span class="sv" id="st-req">—</span>
     </div>
     <div class="stat">
-      <span class="stat-label">% of Req</span>
-      <span class="stat-value" id="st-pct">—</span>
-    </div>
-    <div class="stat">
-      <span class="stat-label">Avg/Grille</span>
-      <span class="stat-value" id="st-avg">—</span>
+      <span class="sl">% of Req</span>
+      <span class="sv" id="st-pct">—</span>
     </div>
   </div>
 
@@ -433,50 +336,42 @@ tfoot td {
   <div class="table-wrap">
     <table>
       <colgroup>
-        <col class="c-num">
+        <col class="c-idx">
         <col class="c-name">
-        <col class="c-num3">
-        <col class="c-num3">
-        <col class="c-num3" id="col-corr" style="display:none">
+        <col class="c-req">
+        <col class="c-cur">
         <col class="c-damp">
-        <col class="c-rdamp">
-        <col class="c-pct">
+        <col class="c-rec">
         <col class="c-del">
       </colgroup>
       <thead>
         <tr>
-          <th>#</th>
-          <th>Grille</th>
-          <th style="text-align:right">Req Flow</th>
-          <th style="text-align:right">Cur Flow</th>
-          <th id="th-corr" style="display:none;text-align:right">Corr Flow</th>
-          <th style="text-align:right">Cur Damp%</th>
-          <th style="text-align:right">Rec Damp%</th>
-          <th style="text-align:right">% Total</th>
+          <th class="left">#</th>
+          <th class="left">Grille</th>
+          <th id="th-req">Req</th>
+          <th>Cur</th>
+          <th>Damp%</th>
+          <th>Rec%</th>
           <th></th>
         </tr>
       </thead>
       <tbody id="tbody">
         <tr class="empty-row" id="emptyRow">
-          <td colspan="9">No grilles yet — click + Grille to add one</td>
+          <td colspan="7">Tap + Grille to begin</td>
         </tr>
       </tbody>
       <tfoot>
-        <tr>
-          <td colspan="9">
-            <button class="btn primary" onclick="addRow()">+ Add Grille</button>
-          </td>
-        </tr>
+        <tr><td colspan="7">
+          <button class="btn p" onclick="addRow()">+ Add Grille</button>
+        </td></tr>
       </tfoot>
     </table>
   </div>
 
   <!-- SUMMARY -->
-  <div class="summary-panel">
-    <div class="summary-inner" id="summaryInner">
-      <span class="summary-label">Actions</span>
-      <span class="chip chip-ok">✓ Enter data to see recommendations</span>
-    </div>
+  <div class="sumbar" id="sumbar">
+    <span class="sum-lbl">Actions</span>
+    <span class="chip chip-ok">✓ Enter data to begin</span>
   </div>
 
 </div>
@@ -484,37 +379,39 @@ tfoot td {
 let rowCount = 0;
 let rowIds = [];
 
+// ── SYSTEM NAME ───────────────────────────────────────
+function onSysName() {
+  const v = document.getElementById('fanName').value;
+  document.getElementById('brandSub').textContent = v || 'no system';
+  saveState();
+}
+
+// ── CORRECTION FACTOR ─────────────────────────────────
 function toggleCF() {
   const on = document.getElementById('useCF').checked;
   document.getElementById('cfVal').style.display = on ? 'inline-block' : 'none';
-  document.getElementById('col-corr').style.display = on ? '' : 'none';
-  document.getElementById('th-corr').style.display = on ? '' : 'none';
-  document.getElementById('st-corr-box').style.display = on ? '' : 'none';
-  rowIds.forEach(id => {
-    const el = document.getElementById('td-corr-' + id);
-    if (el) el.style.display = on ? '' : 'none';
-  });
+  // Update header to show CF is applied to Req
+  document.getElementById('th-req').textContent = on ? 'Req×CF' : 'Req';
   recalc(); saveState();
 }
 
+// ── ADD ROW ───────────────────────────────────────────
 function addRow(name='', req='', cur='', damp='100') {
   rowCount++;
   const id = rowCount;
   rowIds.push(id);
   document.getElementById('emptyRow').style.display = 'none';
-  const useCF = document.getElementById('useCF').checked;
+
   const tr = document.createElement('tr');
   tr.id = 'row-' + id;
   tr.innerHTML = `
-    <td class="td-num">${rowIds.length}</td>
-    <td><input class="cell-input" id="rname-${id}" type="text" placeholder="G${rowIds.length}" value="${esc(name)}" oninput="recalc()"></td>
-    <td><input class="cell-input" id="rreq-${id}" type="number" min="0" step="any" inputmode="decimal" value="${req}" oninput="recalc()" style="text-align:right"></td>
-    <td><input class="cell-input" id="rcur-${id}" type="number" min="0" step="any" inputmode="decimal" value="${cur}" oninput="recalc()" style="text-align:right"></td>
-    <td id="td-corr-${id}" style="display:${useCF?'':'none'};text-align:right"><span id="corr-${id}" style="font-size:12px;color:var(--text-dim);display:block;text-align:right">—</span></td>
-    <td><input class="cell-input" id="rdamp-${id}" type="number" min="0" max="100" inputmode="decimal" value="${damp}" oninput="recalc()" style="text-align:right"></td>
-    <td style="text-align:right"><span class="rec-damper empty" id="rdampval-${id}">—</span></td>
-    <td style="text-align:right"><span class="pct-cell" id="pctval-${id}">—</span></td>
-    <td><button class="del-btn" onclick="removeRow(${id})">×</button></td>
+    <td class="idx" id="idx-${id}">${rowIds.length}</td>
+    <td><input class="ci" id="rname-${id}" type="text" placeholder="G${rowIds.length}" value="${esc(name)}" oninput="recalc()"></td>
+    <td><input class="ci" id="rreq-${id}" type="number" min="0" step="any" inputmode="decimal" value="${req}" oninput="recalc()"></td>
+    <td><input class="ci" id="rcur-${id}" type="number" min="0" step="any" inputmode="decimal" value="${cur}" oninput="recalc()"></td>
+    <td><input class="ci" id="rdamp-${id}" type="number" min="0" max="100" inputmode="decimal" value="${damp}" oninput="recalc()"></td>
+    <td><span class="rd empty" id="rrec-${id}">—</span></td>
+    <td><button class="db" onclick="removeRow(${id})">×</button></td>
   `;
   document.getElementById('tbody').appendChild(tr);
   if (!name) setTimeout(() => document.getElementById('rname-' + id)?.focus(), 30);
@@ -524,14 +421,16 @@ function addRow(name='', req='', cur='', damp='100') {
 function removeRow(id) {
   rowIds = rowIds.filter(i => i !== id);
   document.getElementById('row-' + id)?.remove();
-  if (rowIds.length === 0) document.getElementById('emptyRow').style.display = '';
+  if (!rowIds.length) document.getElementById('emptyRow').style.display = '';
   renumber(); recalc(); saveState();
 }
 
 function renumber() {
   rowIds.forEach((id, i) => {
-    const n = document.querySelector('#row-' + id + ' .td-num');
-    if (n) n.textContent = i + 1;
+    const el = document.getElementById('idx-' + id);
+    if (el) el.textContent = i + 1;
+    const ni = document.getElementById('rname-' + id);
+    if (ni && !ni.value) ni.placeholder = 'G' + (i + 1);
   });
 }
 
@@ -540,7 +439,7 @@ function clearAll() {
   rowIds.forEach(id => document.getElementById('row-' + id)?.remove());
   rowIds = []; rowCount = 0;
   document.getElementById('emptyRow').style.display = '';
-  localStorage.removeItem('aft3');
+  localStorage.removeItem('aft4');
   recalc();
 }
 
@@ -558,104 +457,118 @@ function sortRows() {
   data.forEach(d => addRow(d.name, d.req, d.cur, d.damp));
 }
 
+// ── RECALCULATE ───────────────────────────────────────
 function recalc() {
   const useCF = document.getElementById('useCF').checked;
   const cf = useCF ? (parseFloat(document.getElementById('cfVal').value) || 1) : 1;
 
-  let totCur = 0, totCorr = 0, totReq = 0;
+  let totCur = 0, totReqAdj = 0;
   const rows = rowIds.map(id => {
     const cur  = parseFloat(document.getElementById('rcur-' + id)?.value)  || 0;
     const req  = parseFloat(document.getElementById('rreq-' + id)?.value)  || 0;
     const damp = parseFloat(document.getElementById('rdamp-' + id)?.value) || 100;
-    const corr = cur * cf;
-    totCur += cur; totCorr += corr; totReq += req;
-    return { id, cur, req, damp, corr };
+    const reqAdj = req * cf;  // CF applied to required flow
+    totCur    += cur;
+    totReqAdj += reqAdj;
+    return { id, cur, req, reqAdj, damp };
   });
 
-  const effTotal = useCF ? totCorr : totCur;
+  // Fan speed recommendation: scale fan so total current = total adjusted required
   const curSpeed = parseFloat(document.getElementById('fanSpeed').value) || 0;
   let recSpeed = 0, ratio = 1;
-  if (effTotal > 0 && totReq > 0 && curSpeed > 0) {
-    recSpeed = Math.max(0, Math.min(100, Math.round((totReq / effTotal) * curSpeed)));
+  if (totCur > 0 && totReqAdj > 0 && curSpeed > 0) {
+    recSpeed = Math.max(0, Math.min(100, Math.round((totReqAdj / totCur) * curSpeed)));
     ratio = recSpeed / curSpeed;
   }
 
   const rsEl = document.getElementById('recSpeed');
-  if (effTotal > 0 && curSpeed > 0) {
+  if (totCur > 0 && curSpeed > 0) {
     rsEl.textContent = recSpeed + '%';
-    rsEl.className = 'rec-speed-val ' + (recSpeed === curSpeed ? 'ok' : 'changed');
-  } else { rsEl.textContent = '—'; rsEl.className = 'rec-speed-val'; }
+    rsEl.className = 'rec-val ' + (recSpeed === curSpeed ? 'ok' : 'changed');
+  } else {
+    rsEl.textContent = '—';
+    rsEl.className = 'rec-val';
+  }
 
+  // Per-row
   const actions = [];
-  if (recSpeed !== curSpeed && effTotal > 0 && curSpeed > 0)
-    actions.push({ type: 'fan', text: `Fan: ${curSpeed}% → ${recSpeed}%` });
+  if (recSpeed !== curSpeed && totCur > 0 && curSpeed > 0)
+    actions.push({ type: 'fan', text: `Fan ${curSpeed}% → ${recSpeed}%` });
 
   rows.forEach(r => {
-    const eff = useCF ? r.corr : r.cur;
-    const proj = eff * ratio;
+    // Project current flow at new fan speed, compare to adjusted required
+    const proj = r.cur * ratio;
     let recD = r.damp;
-    if (proj > 0 && r.req > 0)
-      recD = Math.max(0, Math.min(100, Math.round((r.req / proj) * r.damp)));
+    if (proj > 0 && r.reqAdj > 0)
+      recD = Math.max(0, Math.min(100, Math.round((r.reqAdj / proj) * r.damp)));
 
-    const corrEl = document.getElementById('corr-' + r.id);
-    if (corrEl) corrEl.textContent = useCF ? r.corr.toFixed(1) : '—';
-
-    const rdEl = document.getElementById('rdampval-' + r.id);
-    if (rdEl) {
-      if (proj > 0) { rdEl.textContent = recD + '%'; rdEl.className = 'rec-damper ' + (recD !== r.damp ? 'changed' : 'ok'); }
-      else { rdEl.textContent = '—'; rdEl.className = 'rec-damper empty'; }
+    const el = document.getElementById('rrec-' + r.id);
+    if (el) {
+      if (proj > 0 && r.reqAdj > 0) {
+        el.textContent = recD + '%';
+        el.className = 'rd ' + (recD !== r.damp ? 'changed' : 'ok');
+      } else {
+        el.textContent = '—';
+        el.className = 'rd empty';
+      }
     }
 
-    const pctEl = document.getElementById('pctval-' + r.id);
-    if (pctEl) pctEl.textContent = effTotal > 0 ? (eff / effTotal * 100).toFixed(1) + '%' : '—';
-
-    if (recD !== r.damp && proj > 0) {
+    if (recD !== r.damp && proj > 0 && r.reqAdj > 0) {
       const nm = document.getElementById('rname-' + r.id)?.value || ('#' + r.id);
-      actions.push({ type: 'damp', text: `${nm}: ${r.damp}% → ${recD}%` });
+      actions.push({ type: 'damp', text: `${nm}: ${r.damp}%→${recD}%` });
     }
   });
 
+  // Stats
   const n = rowIds.length;
-  document.getElementById('st-count').textContent = n;
-  document.getElementById('st-cur').textContent  = n ? fmt(totCur)  : '—';
-  document.getElementById('st-corr').textContent = n ? fmt(totCorr) : '—';
-  document.getElementById('st-req').textContent  = n ? fmt(totReq)  : '—';
-  const pctReq = (totReq > 0 && effTotal > 0) ? (effTotal / totReq * 100) : null;
-  const pEl = document.getElementById('st-pct');
-  pEl.textContent = pctReq !== null ? pctReq.toFixed(1) + '%' : '—';
-  pEl.className = 'stat-value' + (pctReq === null ? '' : Math.abs(pctReq - 100) < 5 ? ' ok' : ' warn');
-  document.getElementById('st-avg').textContent = (n && effTotal) ? fmt(effTotal / n) : '—';
+  document.getElementById('st-n').textContent   = n;
+  document.getElementById('st-cur').textContent = n ? fmt(totCur)    : '—';
+  document.getElementById('st-req').textContent = n ? fmt(totReqAdj) : '—';
+  document.getElementById('st-req-lbl').textContent = useCF ? 'Req×CF' : 'Req Flow';
 
-  const inner = document.getElementById('summaryInner');
-  inner.innerHTML = '<span class="summary-label">Actions</span>';
+  const pctEl = document.getElementById('st-pct');
+  if (n && totReqAdj > 0) {
+    const pct = totCur / totReqAdj * 100;
+    pctEl.textContent = pct.toFixed(1) + '%';
+    pctEl.className = 'sv ' + (Math.abs(pct - 100) < 5 ? 'ok' : 'warn');
+  } else {
+    pctEl.textContent = '—';
+    pctEl.className = 'sv';
+  }
+
+  // Summary chips
+  const bar = document.getElementById('sumbar');
+  bar.innerHTML = '<span class="sum-lbl">Actions</span>';
   if (!actions.length) {
-    inner.innerHTML += `<span class="chip chip-ok">✓ ${n === 0 ? 'Add grilles to begin' : 'System balanced'}</span>`;
+    bar.innerHTML += `<span class="chip chip-ok">✓ ${n === 0 ? 'Add grilles to begin' : 'System balanced'}</span>`;
   } else {
     actions.forEach(a => {
-      inner.innerHTML += `<span class="chip ${a.type === 'fan' ? 'chip-fan' : 'chip-damp'}">${a.type === 'fan' ? '⚡' : '🔧'} ${a.text}</span>`;
+      bar.innerHTML += `<span class="chip ${a.type === 'fan' ? 'chip-fan' : 'chip-damp'}">${a.type === 'fan' ? '⚡' : '🔧'} ${a.text}</span>`;
     });
   }
+
   saveState();
 }
 
+// ── SAVE / LOAD ───────────────────────────────────────
 function saveState() {
-  const s = {
-    fanName: document.getElementById('fanName').value,
+  localStorage.setItem('aft4', JSON.stringify({
+    fanName:  document.getElementById('fanName').value,
     fanSpeed: document.getElementById('fanSpeed').value,
-    useCF: document.getElementById('useCF').checked,
-    cfVal: document.getElementById('cfVal').value,
+    useCF:    document.getElementById('useCF').checked,
+    cfVal:    document.getElementById('cfVal').value,
     rows: rowIds.map(id => ({
       name: document.getElementById('rname-' + id)?.value ?? '',
       req:  document.getElementById('rreq-' + id)?.value ?? '',
       cur:  document.getElementById('rcur-' + id)?.value ?? '',
       damp: document.getElementById('rdamp-' + id)?.value ?? '100',
     }))
-  };
-  localStorage.setItem('aft3', JSON.stringify(s));
+  }));
 }
 
 function loadState() {
-  const raw = localStorage.getItem('aft3')
+  const raw = localStorage.getItem('aft4')
+    || localStorage.getItem('aft3')
     || localStorage.getItem('airflowToolState2')
     || localStorage.getItem('airflowToolState');
   if (!raw) { recalc(); return; }
@@ -665,62 +578,67 @@ function loadState() {
     document.getElementById('fanSpeed').value = s.fanSpeed || 50;
     document.getElementById('useCF').checked  = !!s.useCF;
     document.getElementById('cfVal').value    = s.cfVal    || 1.0;
+    onSysName();
     if (s.useCF) toggleCF();
     (s.rows || s.grilles || []).forEach(r =>
       addRow(r.name || r.label || '', r.req || r.required || '', r.cur || r.current || '', r.damp || r.damper || '100')
     );
-  } catch(e) {}
+  } catch(e) { console.warn('load failed', e); }
   recalc();
 }
 
+// ── EXPORT CSV ────────────────────────────────────────
 function exportCSV() {
-  const useCF = document.getElementById('useCF').checked;
-  const cf    = useCF ? (parseFloat(document.getElementById('cfVal').value) || 1) : 1;
-  const name  = document.getElementById('fanName').value || 'System';
-  const speed = document.getElementById('fanSpeed').value;
-  const date  = new Date().toLocaleDateString();
+  const useCF   = document.getElementById('useCF').checked;
+  const cf      = useCF ? (parseFloat(document.getElementById('cfVal').value) || 1) : 1;
+  const sysName = document.getElementById('fanName').value || 'System';
+  const speed   = document.getElementById('fanSpeed').value;
+  const date    = new Date().toLocaleDateString();
 
-  let totCur = 0, totCorr = 0, totReq = 0;
+  let totCur = 0, totReqAdj = 0;
   const data = rowIds.map((id, i) => {
-    const n = document.getElementById('rname-' + id)?.value || '';
+    const name = document.getElementById('rname-' + id)?.value || '';
     const req  = parseFloat(document.getElementById('rreq-' + id)?.value)  || 0;
     const cur  = parseFloat(document.getElementById('rcur-' + id)?.value)  || 0;
     const damp = parseFloat(document.getElementById('rdamp-' + id)?.value) || 100;
-    const corr = cur * cf;
-    totCur += cur; totCorr += corr; totReq += req;
-    return { i: i+1, n, req, cur, damp, corr };
+    const reqAdj = req * cf;
+    totCur += cur; totReqAdj += reqAdj;
+    return { i: i+1, name, req, reqAdj, cur, damp };
   });
 
-  const effTotal = useCF ? totCorr : totCur;
   const curSpeed = parseFloat(speed) || 0;
   let recSpeed = 0, ratio = 1;
-  if (effTotal > 0 && totReq > 0 && curSpeed > 0) {
-    recSpeed = Math.max(0, Math.min(100, Math.round((totReq / effTotal) * curSpeed)));
+  if (totCur > 0 && totReqAdj > 0 && curSpeed > 0) {
+    recSpeed = Math.max(0, Math.min(100, Math.round((totReqAdj / totCur) * curSpeed)));
     ratio = recSpeed / curSpeed;
   }
 
-  const hdrs = ['#','Grille','Req Flow','Cur Flow',...(useCF?['Corr Flow']:[]),'Cur Damp%','Rec Damp%','% Total'];
+  const cfHdr = useCF ? `Req Flow (×${cf})` : 'Req Flow';
+  const headers = ['#','Grille', cfHdr,'Cur Flow','Cur Damp%','Rec Damp%'];
+  if (useCF) headers.splice(2, 0, 'Req Flow (raw)');
+
   const csvRows = [
-    [`Airflow Balancing Report — ${name} — ${date}`],
-    [`Fan Speed: ${speed}%`, `Recommended: ${recSpeed}%`, useCF ? `CF: ${cf}` : ''].filter(Boolean),
+    [`Airflow Balancing Report — ${sysName} — ${date}`],
+    [`Fan Speed: ${speed}%`, `Recommended: ${recSpeed}%`, useCF ? `Correction Factor: ${cf}` : ''].filter(Boolean),
     [],
-    hdrs,
+    headers,
     ...data.map(r => {
-      const proj = (useCF ? r.corr : r.cur) * ratio;
+      const proj = r.cur * ratio;
       let recD = r.damp;
-      if (proj > 0 && r.req > 0) recD = Math.max(0, Math.min(100, Math.round((r.req / proj) * r.damp)));
-      const pct = effTotal > 0 ? ((useCF ? r.corr : r.cur) / effTotal * 100).toFixed(1) + '%' : '—';
-      return [r.i, r.n, r.req, r.cur, ...(useCF ? [r.corr.toFixed(2)] : []), r.damp + '%', recD + '%', pct];
+      if (proj > 0 && r.reqAdj > 0) recD = Math.max(0, Math.min(100, Math.round((r.reqAdj / proj) * r.damp)));
+      const row = [r.i, r.name, r.reqAdj.toFixed(1), r.cur, r.damp + '%', recD + '%'];
+      if (useCF) row.splice(2, 0, r.req);
+      return row;
     }),
     [],
-    ['Totals','', fmt(totCur), ...(useCF ? [fmt(totCorr)] : []),'','',''],
-    ['Required','', fmt(totReq)],
-  ];
+    ['Totals', '', fmt(totReqAdj), fmt(totCur)],
+    useCF ? ['Raw Totals', '', '', ''] : [],
+  ].filter(r => r.length);
 
   const csv = csvRows.map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-  a.download = `airflow-${name.replace(/\s+/g,'-').toLowerCase()}-${date.replace(/\//g,'-')}.csv`;
+  a.download = `airflow-${sysName.replace(/\s+/g,'-').toLowerCase()}-${date.replace(/\//g,'-')}.csv`;
   a.click();
 }
 
