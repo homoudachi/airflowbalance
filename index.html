@@ -2,293 +2,909 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Airflow Balancing Tool</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg: #f5f4f0;
+      --surface: #ffffff;
+      --border: #d0cfc8;
+      --border-strong: #a0a099;
+      --text: #1a1a18;
+      --text-muted: #6b6b65;
+      --accent: #1a4fa8;
+      --accent-light: #e8eef8;
+      --warn: #c47900;
+      --warn-light: #fff8e6;
+      --ok: #1a7a3c;
+      --ok-light: #e8f5ed;
+      --danger: #c42b2b;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+      --radius: 6px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      max-width: 100%;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* HEADER */
+    .app-header {
+      background: var(--text);
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .app-title {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      opacity: 0.95;
+    }
+    .app-subtitle {
+      font-size: 11px;
+      opacity: 0.5;
+      font-family: var(--mono);
+      margin-top: 2px;
+    }
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* MAIN LAYOUT */
+    .app-body {
+      padding: 16px;
+      max-width: 900px;
       margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
     }
-    input, button {
-      padding: 5px;
-      margin: 2px 0;
-      font-size: 12px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 20px;
-      table-layout: fixed;
-    }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 4px 8px;
-      text-align: left;
-      white-space: nowrap;
+
+    /* CARDS */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
       overflow: hidden;
-      text-overflow: ellipsis;
     }
-    th {
-      background-color: #f2f2f2;
+    .card-header {
+      padding: 10px 14px;
+      background: #f9f9f7;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
-    .highlight {
-      background-color: #ffff99;
+    .card-body {
+      padding: 14px;
     }
-    #summary {
-      margin-top: 20px;
-      white-space: pre-line;
+
+    /* FORM CONTROLS */
+    .field-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 12px;
     }
-    .highlight-if-changed {
+    .field-row:last-child { margin-bottom: 0; }
+    label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+    input[type="text"],
+    input[type="number"] {
+      font-family: var(--mono);
+      font-size: 14px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--text);
+      width: 100%;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    input[type="text"]:focus,
+    input[type="number"]:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: white;
+    }
+
+    .fan-speed-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .rec-speed-box {
+      padding: 8px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .rec-speed-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+      margin-bottom: 4px;
+    }
+    .rec-speed-value {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .rec-speed-value.needs-change {
+      color: var(--warn);
+    }
+    .rec-speed-delta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* TOGGLE */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+    }
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      left: 3px; top: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    .toggle input:checked + .toggle-slider { background: var(--accent); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+    .toggle-label { font-size: 13px; font-weight: 500; }
+    .toggle-sub { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+
+    /* GRILLE CARDS (mobile) */
+    .grille-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .grille-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .grille-card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: #f9f9f7;
+      border-bottom: 1px solid var(--border);
+    }
+    .grille-card-header input[type="text"] {
+      background: transparent;
+      border: none;
+      padding: 0;
+      font-weight: 600;
+      font-size: 13px;
+      flex: 1;
+    }
+    .grille-card-header input[type="text"]:focus {
+      background: transparent;
+      border-bottom: 1px solid var(--accent);
+    }
+    .grille-num {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      background: var(--border);
       padding: 2px 5px;
       border-radius: 3px;
+      flex-shrink: 0;
     }
-    .needs-change {
-      background-color: #ffff99;
+    .grille-card-body {
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
     }
-    input[type="number"] {
-      width: 50px;
+    .grille-field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .grille-field label {
+      font-size: 10px;
+    }
+    .grille-field input[type="number"] {
+      font-size: 16px; /* prevents iOS zoom */
+      padding: 8px 10px;
+    }
+    .grille-card-footer {
+      padding: 8px 10px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: #fafaf8;
+    }
+    .grille-result {
+      display: flex;
+      gap: 14px;
+      font-family: var(--mono);
       font-size: 12px;
-      text-align: center;
     }
-    @media (max-width: 600px) {
-      body { padding: 10px; }
-      table { font-size: 10px; }
-      input[type="number"] { width: 40px; }
-      th, td { padding: 3px; }
+    .grille-result-item {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .grille-result-item span:first-child {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .grille-result-item .rec-val {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .rec-val.changed { color: var(--warn); }
+    .rec-val.ok { color: var(--ok); }
+
+    /* STATS GRID */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .stat-box {
+      padding: 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-family: var(--mono);
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .stat-value.warn { color: var(--warn); }
+    .stat-value.ok { color: var(--ok); }
+
+    /* SUMMARY */
+    .summary-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .summary-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .summary-item.fan-action {
+      background: var(--accent-light);
+      border: 1px solid #c2d0e8;
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .summary-item.damper-action {
+      background: var(--warn-light);
+      border: 1px solid #f0d8a0;
+      color: #7a4d00;
+    }
+    .summary-item.all-good {
+      background: var(--ok-light);
+      border: 1px solid #b0d9be;
+      color: var(--ok);
+    }
+    .summary-icon {
+      font-size: 15px;
+      flex-shrink: 0;
+      margin-top: 0px;
+    }
+
+    /* BUTTONS */
+    .btn {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 9px 14px;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    .btn-primary:active { background: #143d85; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--border);
+      background: var(--surface);
+    }
+    .btn-ghost:active { background: var(--bg); }
+    .btn-danger {
+      background: transparent;
+      color: var(--danger);
+      border-color: transparent;
+      padding: 6px 8px;
+      font-size: 16px;
+    }
+    .btn-danger:active { background: #fdeaea; }
+    .btn-icon {
+      background: transparent;
+      border: none;
+      font-size: 16px;
+      padding: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .action-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .export-bar {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* EMPTY STATE */
+    .empty-state {
+      text-align: center;
+      padding: 32px 16px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+      font-size: 13px;
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+    }
+    .empty-icon { font-size: 32px; margin-bottom: 8px; }
+
+    @media (min-width: 600px) {
+      .app-body { padding: 20px; gap: 16px; }
+      .stats-grid { grid-template-columns: repeat(4, 1fr); }
+      .fan-speed-row { grid-template-columns: 160px 1fr; }
+    }
+
+    @media print {
+      .app-header, .action-bar, .export-bar, .btn-danger, .card-header .btn, button { display: none !important; }
+      body { background: white; }
+      .card { box-shadow: none; border: 1px solid #ccc; }
     }
   </style>
 </head>
 <body>
-  <h1>Airflow Balancing Tool</h1>
 
+<header class="app-header">
   <div>
-    <label for="fanName">Fan Name:</label>
-    <input type="text" id="fanName" placeholder="Enter fan name">
+    <div class="app-title">Airflow Balancing Tool</div>
+    <div class="app-subtitle">HVAC commissioning assistant</div>
   </div>
-  <div>
-    <label for="fanSpeed">Current Fan Speed (%):</label>
-    <input type="number" id="fanSpeed" min="0" max="100" value="50" onchange="updateCalculations()">
-    <span>Recommended Fan Speed: <span id="recommendedFanSpeed" class="highlight-if-changed">50%</span></span>
+  <div class="export-bar">
+    <button class="btn btn-ghost" onclick="exportCSV()" title="Export CSV">⬇ CSV</button>
+    <button class="btn btn-ghost" onclick="window.print()" title="Print / Save PDF">⎙ PDF</button>
   </div>
-  <div>
-    <input type="checkbox" id="useCorrectionFactor" onchange="toggleCorrectionFactor()">
-    <label for="useCorrectionFactor">Use Correction Factor</label>
-    <input type="number" id="correctionFactor" min="0.1" step="0.1" value="1.0" onchange="updateCalculations()" style="display: none;">
+</header>
+
+<div class="app-body">
+
+  <!-- FAN SETTINGS -->
+  <div class="card">
+    <div class="card-header">Fan Settings</div>
+    <div class="card-body">
+      <div class="field-row">
+        <label for="fanName">Fan / System Name</label>
+        <input type="text" id="fanName" placeholder="e.g. AHU-01 Supply" oninput="saveState()">
+      </div>
+      <div class="fan-speed-row">
+        <div class="field-row" style="margin-bottom:0">
+          <label for="fanSpeed">Current Speed (%)</label>
+          <input type="number" id="fanSpeed" min="0" max="100" value="50" oninput="updateCalculations()">
+        </div>
+        <div class="rec-speed-box">
+          <div class="rec-speed-label">Recommended Speed</div>
+          <div class="rec-speed-value" id="recommendedFanSpeed">—</div>
+          <div class="rec-speed-delta" id="fanSpeedDelta"></div>
+        </div>
+      </div>
+      <div class="toggle-row" style="margin-top:12px">
+        <label class="toggle">
+          <input type="checkbox" id="useCorrectionFactor" onchange="toggleCorrectionFactor()">
+          <span class="toggle-slider"></span>
+        </label>
+        <div>
+          <div class="toggle-label">Correction Factor</div>
+          <div class="toggle-sub" id="cfLabel">Disabled</div>
+        </div>
+        <input type="number" id="correctionFactor" min="0.1" step="0.01" value="1.0"
+          oninput="updateCalculations()" style="display:none; width:80px; margin-left:auto;">
+      </div>
+    </div>
   </div>
 
-  <table id="grilleTable">
-    <tr id="headerRow">
-      <th>Grille</th>
-      <th>Req Flow</th>
-      <th>Curr. Flow</th>
-      <th>Curr. Damper</th>
-      <th>Rec. Damper</th>
-      <th>% of Total</th>
-      <th>Action</th>
-    </tr>
-  </table>
-
-  <button onclick="addGrille()">Add Grille</button>
-  <button onclick="clearAll()">Clear All</button>
-  <button onclick="sortGrilles()">Sort Grilles Alphabetically</button>
-
-  <div>
-    <p>Total Current Airflow: <span id="totalAirflow">0</span></p>
-    <p id="totalCorrectedAirflowRow" style="display: none;">Total Corrected Airflow: <span id="totalCorrectedAirflow">0</span></p>
-    <p>Total Required Airflow: <span id="totalRequiredAirflow">0</span></p>
-    <p>Percentage of Total Required Airflow: <span id="percentageRequiredAirflow">0%</span></p>
-    <p>Average Airflow of Grilles: <span id="averageAirflow">0</span></p>
+  <!-- GRILLES -->
+  <div class="card">
+    <div class="card-header">
+      Grilles
+      <span id="grilleCount" style="font-size:11px; color:var(--text-muted)">0 grilles</span>
+    </div>
+    <div class="card-body" style="padding:10px">
+      <div class="grille-list" id="grilleList">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">🌬️</div>
+          Add a grille to get started
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="padding:10px; border-top:1px solid var(--border)">
+      <div class="action-bar">
+        <button class="btn btn-primary" onclick="addGrille()">+ Add Grille</button>
+        <button class="btn btn-ghost" onclick="sortGrilles()">↕ Sort A–Z</button>
+        <button class="btn btn-ghost" onclick="clearAll()" style="color:var(--danger); margin-left:auto">🗑 Clear All</button>
+      </div>
+    </div>
   </div>
-  <div id="summary"></div>
 
-  <script>
-    let grilleCount = 0;
+  <!-- STATS -->
+  <div class="card">
+    <div class="card-header">Totals</div>
+    <div class="card-body">
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-label">Current Airflow</div>
+          <div class="stat-value" id="totalAirflow">—</div>
+        </div>
+        <div class="stat-box" id="totalCorrectedAirflowBox" style="display:none">
+          <div class="stat-label">Corrected Airflow</div>
+          <div class="stat-value" id="totalCorrectedAirflow">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Required Airflow</div>
+          <div class="stat-value" id="totalRequiredAirflow">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">% of Required</div>
+          <div class="stat-value" id="percentageRequiredAirflow">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Avg per Grille</div>
+          <div class="stat-value" id="averageAirflow">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    function saveState() {
-      const state = {
-        fanName: document.getElementById('fanName').value,
-        fanSpeed: document.getElementById('fanSpeed').value,
-        useCorrectionFactor: document.getElementById('useCorrectionFactor').checked,
-        correctionFactor: document.getElementById('correctionFactor').value,
-        grilles: []
-      };
-      const table = document.getElementById('grilleTable');
-      for (let i = 1; i < table.rows.length; i++) {
-        const cells = table.rows[i].getElementsByTagName('input');
-        const grille = {
-          label: cells[0]?.value || '',
-          required: cells[1]?.value || '',
-          current: cells[2]?.value || '',
-          damper: cells[cells.length - 1]?.value || ''
-        };
-        state.grilles.push(grille);
-      }
-      localStorage.setItem('airflowToolState', JSON.stringify(state));
+  <!-- SUMMARY -->
+  <div class="card">
+    <div class="card-header">Action Summary</div>
+    <div class="card-body">
+      <div class="summary-list" id="summaryList">
+        <div class="summary-item all-good">
+          <span class="summary-icon">✓</span>
+          Add grilles and airflow data to see recommendations.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let grilleCount = 0;
+  let grilles = []; // {id, name, required, current, damper}
+
+  // ── SAVE / LOAD ──────────────────────────────────────
+  function saveState() {
+    const state = {
+      fanName: document.getElementById('fanName').value,
+      fanSpeed: document.getElementById('fanSpeed').value,
+      useCorrectionFactor: document.getElementById('useCorrectionFactor').checked,
+      correctionFactor: document.getElementById('correctionFactor').value,
+      grilles: grilles.map(g => ({
+        id: g.id,
+        name: document.getElementById('gname-' + g.id)?.value ?? g.name,
+        required: document.getElementById('greq-' + g.id)?.value ?? g.required,
+        current: document.getElementById('gcur-' + g.id)?.value ?? g.current,
+        damper: document.getElementById('gdamp-' + g.id)?.value ?? g.damper,
+      }))
+    };
+    localStorage.setItem('airflowToolState2', JSON.stringify(state));
+  }
+
+  function loadState() {
+    const saved = localStorage.getItem('airflowToolState2');
+    // Also migrate old format
+    const old = localStorage.getItem('airflowToolState');
+    const raw = saved || old;
+    if (!raw) { updateCalculations(); return; }
+    const state = JSON.parse(raw);
+    document.getElementById('fanName').value = state.fanName || '';
+    document.getElementById('fanSpeed').value = state.fanSpeed || 50;
+    document.getElementById('useCorrectionFactor').checked = !!state.useCorrectionFactor;
+    document.getElementById('correctionFactor').value = state.correctionFactor || 1.0;
+    if (state.useCorrectionFactor) toggleCorrectionFactor(true);
+    grilles = [];
+    grilleCount = 0;
+    (state.grilles || []).forEach(g => addGrille(g.name, g.required, g.current, g.damper));
+    updateCalculations();
+  }
+
+  // ── CORRECTION FACTOR ────────────────────────────────
+  function toggleCorrectionFactor(silent) {
+    const on = document.getElementById('useCorrectionFactor').checked;
+    const cfInput = document.getElementById('correctionFactor');
+    const cfLabel = document.getElementById('cfLabel');
+    const box = document.getElementById('totalCorrectedAirflowBox');
+    cfInput.style.display = on ? 'inline-block' : 'none';
+    box.style.display = on ? 'block' : 'none';
+    cfLabel.textContent = on ? `Factor: ${cfInput.value}` : 'Disabled';
+    if (!silent) { updateCalculations(); saveState(); }
+  }
+
+  // ── GRILLE MANAGEMENT ────────────────────────────────
+  function addGrille(name = '', required = '', current = '', damper = '100') {
+    grilleCount++;
+    const id = Date.now() + grilleCount;
+    grilles.push({ id, name, required, current, damper });
+    renderGrilleCard(id, grilleCount, name, required, current, damper);
+    document.getElementById('emptyState').style.display = 'none';
+    updateCalculations();
+    saveState();
+  }
+
+  function renderGrilleCard(id, num, name, required, current, damper) {
+    const list = document.getElementById('grilleList');
+    const div = document.createElement('div');
+    div.className = 'grille-card';
+    div.id = 'gcard-' + id;
+    div.innerHTML = `
+      <div class="grille-card-header">
+        <span class="grille-num">#${num}</span>
+        <input type="text" id="gname-${id}" placeholder="Grille name" value="${name}"
+          oninput="updateCalculations()" style="background:transparent;border:none;font-weight:600;font-size:13px;flex:1;padding:0;">
+        <button class="btn btn-danger" onclick="removeGrille(${id})" title="Remove">×</button>
+      </div>
+      <div class="grille-card-body">
+        <div class="grille-field">
+          <label for="greq-${id}">Required Flow</label>
+          <input type="number" id="greq-${id}" placeholder="0" value="${required}" inputmode="decimal" oninput="updateCalculations()">
+        </div>
+        <div class="grille-field">
+          <label for="gcur-${id}">Current Flow</label>
+          <input type="number" id="gcur-${id}" placeholder="0" value="${current}" inputmode="decimal" oninput="updateCalculations()">
+        </div>
+        <div class="grille-field">
+          <label for="gdamp-${id}">Current Damper (%)</label>
+          <input type="number" id="gdamp-${id}" min="0" max="100" value="${damper}" inputmode="decimal" oninput="updateCalculations()">
+        </div>
+        <div class="grille-field" id="gcorr-field-${id}" style="display:none">
+          <label>Corrected Flow</label>
+          <div style="font-family:var(--mono);font-size:16px;font-weight:600;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)" id="gcorr-${id}">—</div>
+        </div>
+      </div>
+      <div class="grille-card-footer">
+        <div class="grille-result">
+          <div class="grille-result-item">
+            <span>Rec. Damper</span>
+            <span class="rec-val" id="grec-${id}">—</span>
+          </div>
+          <div class="grille-result-item">
+            <span>% of Total</span>
+            <span class="rec-val" id="gpct-${id}" style="color:var(--text-muted)">—</span>
+          </div>
+        </div>
+      </div>
+    `;
+    list.appendChild(div);
+
+    // Show corrected flow field if correction factor enabled
+    const useCF = document.getElementById('useCorrectionFactor').checked;
+    if (useCF) document.getElementById('gcorr-field-' + id).style.display = 'block';
+
+    // Focus name if new
+    if (!name) setTimeout(() => document.getElementById('gname-' + id)?.focus(), 50);
+  }
+
+  function removeGrille(id) {
+    grilles = grilles.filter(g => g.id !== id);
+    const card = document.getElementById('gcard-' + id);
+    if (card) card.remove();
+    if (grilles.length === 0) document.getElementById('emptyState').style.display = '';
+    updateCalculations();
+    saveState();
+  }
+
+  function clearAll() {
+    if (!confirm('Clear all grilles and reset? This cannot be undone.')) return;
+    grilles = [];
+    grilleCount = 0;
+    document.getElementById('grilleList').innerHTML = `
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">🌬️</div>
+        Add a grille to get started
+      </div>`;
+    localStorage.removeItem('airflowToolState2');
+    localStorage.removeItem('airflowToolState');
+    updateCalculations();
+  }
+
+  function sortGrilles() {
+    // Read current names
+    const data = grilles.map(g => ({
+      ...g,
+      name: document.getElementById('gname-' + g.id)?.value ?? g.name,
+      required: document.getElementById('greq-' + g.id)?.value ?? g.required,
+      current: document.getElementById('gcur-' + g.id)?.value ?? g.current,
+      damper: document.getElementById('gdamp-' + g.id)?.value ?? g.damper,
+    }));
+    data.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    grilles = [];
+    grilleCount = 0;
+    const list = document.getElementById('grilleList');
+    // Remove all grille cards
+    list.querySelectorAll('.grille-card').forEach(c => c.remove());
+    data.forEach(g => addGrille(g.name, g.required, g.current, g.damper));
+    saveState();
+  }
+
+  // ── CALCULATIONS ─────────────────────────────────────
+  function updateCalculations() {
+    const useCF = document.getElementById('useCorrectionFactor').checked;
+    const cf = useCF ? (parseFloat(document.getElementById('correctionFactor').value) || 1.0) : 1.0;
+    const cfLabel = document.getElementById('cfLabel');
+    if (useCF) cfLabel.textContent = `Factor: ${cf}`;
+
+    // Sync corrected flow field visibility
+    grilles.forEach(g => {
+      const field = document.getElementById('gcorr-field-' + g.id);
+      if (field) field.style.display = useCF ? 'block' : 'none';
+    });
+
+    let totalCurrent = 0, totalCorrected = 0, totalRequired = 0;
+    const data = grilles.map(g => {
+      const current = parseFloat(document.getElementById('gcur-' + g.id)?.value) || 0;
+      const required = parseFloat(document.getElementById('greq-' + g.id)?.value) || 0;
+      const damper = parseFloat(document.getElementById('gdamp-' + g.id)?.value) || 100;
+      const corrected = current * cf;
+      totalCurrent += current;
+      totalCorrected += corrected;
+      totalRequired += required;
+      return { ...g, current, required, damper, corrected };
+    });
+
+    const effectiveTotal = useCF ? totalCorrected : totalCurrent;
+
+    // Fan speed recommendation
+    const currentFanSpeed = parseFloat(document.getElementById('fanSpeed').value) || 0;
+    let recFanSpeed = 0, fanSpeedRatio = 1;
+    if (effectiveTotal > 0 && totalRequired > 0) {
+      recFanSpeed = Math.round((totalRequired / effectiveTotal) * currentFanSpeed);
+      recFanSpeed = Math.max(0, Math.min(100, recFanSpeed));
+      fanSpeedRatio = recFanSpeed / (currentFanSpeed || 1);
     }
 
-    function loadState() {
-      const saved = localStorage.getItem('airflowToolState');
-      if (!saved) return;
-      const state = JSON.parse(saved);
+    const recSpeedEl = document.getElementById('recommendedFanSpeed');
+    const deltaEl = document.getElementById('fanSpeedDelta');
+    if (effectiveTotal > 0) {
+      recSpeedEl.textContent = recFanSpeed + '%';
+      const diff = recFanSpeed - currentFanSpeed;
+      recSpeedEl.className = 'rec-speed-value' + (diff !== 0 ? ' needs-change' : '');
+      deltaEl.textContent = diff === 0 ? 'No change needed' : (diff > 0 ? `▲ +${diff}% from current` : `▼ ${diff}% from current`);
+    } else {
+      recSpeedEl.textContent = '—';
+      deltaEl.textContent = 'Enter flow data';
+    }
 
-      document.getElementById('fanName').value = state.fanName || '';
-      document.getElementById('fanSpeed').value = state.fanSpeed || 50;
-      document.getElementById('useCorrectionFactor').checked = !!state.useCorrectionFactor;
-      document.getElementById('correctionFactor').value = state.correctionFactor || 1.0;
+    // Per-grille results
+    const actions = [];
+    let fanActionAdded = false;
 
-      const table = document.getElementById('grilleTable');
-      while (table.rows.length > 1) table.deleteRow(1);
-      grilleCount = 0;
-      state.grilles.forEach(g => {
-        addGrille(g.label, g.required, g.current, g.damper);
+    if (recFanSpeed !== currentFanSpeed && effectiveTotal > 0) {
+      actions.push({ type: 'fan', text: `Set fan speed from ${currentFanSpeed}% → ${recFanSpeed}%` });
+      fanActionAdded = true;
+    }
+
+    data.forEach(g => {
+      const projected = (useCF ? g.corrected : g.current) * fanSpeedRatio;
+      let recDamper = g.damper;
+      if (projected > 0 && g.required > 0) {
+        recDamper = Math.round((g.required / projected) * g.damper);
+        recDamper = Math.max(0, Math.min(100, recDamper));
+      }
+
+      const pct = effectiveTotal > 0 ? ((useCF ? g.corrected : g.current) / effectiveTotal * 100) : 0;
+
+      // Update corrected flow display
+      const corrEl = document.getElementById('gcorr-' + g.id);
+      if (corrEl) corrEl.textContent = useCF ? g.corrected.toFixed(1) : '—';
+
+      // Update rec damper
+      const recEl = document.getElementById('grec-' + g.id);
+      if (recEl) {
+        recEl.textContent = projected > 0 ? recDamper + '%' : '—';
+        recEl.className = 'rec-val ' + (recDamper !== g.damper ? 'changed' : 'ok');
+      }
+
+      // Update % of total
+      const pctEl = document.getElementById('gpct-' + g.id);
+      if (pctEl) pctEl.textContent = effectiveTotal > 0 ? pct.toFixed(1) + '%' : '—';
+
+      if (recDamper !== g.damper && projected > 0) {
+        const name = document.getElementById('gname-' + g.id)?.value || ('Grille #' + g.id);
+        actions.push({ type: 'damper', text: `${name}: damper ${g.damper}% → ${recDamper}%` });
+      }
+    });
+
+    // Stats
+    document.getElementById('totalAirflow').textContent = totalCurrent > 0 ? totalCurrent.toFixed(1) : '—';
+    document.getElementById('totalCorrectedAirflow').textContent = totalCorrected > 0 ? totalCorrected.toFixed(1) : '—';
+    document.getElementById('totalRequiredAirflow').textContent = totalRequired > 0 ? totalRequired.toFixed(1) : '—';
+    const pctReq = totalRequired > 0 && effectiveTotal > 0 ? (effectiveTotal / totalRequired * 100) : null;
+    const pctEl = document.getElementById('percentageRequiredAirflow');
+    pctEl.textContent = pctReq !== null ? pctReq.toFixed(1) + '%' : '—';
+    pctEl.className = 'stat-value' + (pctReq !== null ? (Math.abs(pctReq - 100) < 5 ? ' ok' : ' warn') : '');
+    document.getElementById('averageAirflow').textContent = (grilles.length > 0 && effectiveTotal > 0)
+      ? (effectiveTotal / grilles.length).toFixed(1) : '—';
+
+    // Grille count
+    document.getElementById('grilleCount').textContent = grilles.length + (grilles.length === 1 ? ' grille' : ' grilles');
+
+    // Summary
+    const summaryList = document.getElementById('summaryList');
+    summaryList.innerHTML = '';
+    if (actions.length === 0) {
+      summaryList.innerHTML = `<div class="summary-item all-good">
+        <span class="summary-icon">✓</span>
+        ${grilles.length === 0 ? 'Add grilles and airflow data to see recommendations.' : 'System is balanced — no adjustments needed.'}
+      </div>`;
+    } else {
+      actions.forEach(a => {
+        const cls = a.type === 'fan' ? 'fan-action' : 'damper-action';
+        const icon = a.type === 'fan' ? '⚡' : '🔧';
+        summaryList.innerHTML += `<div class="summary-item ${cls}">
+          <span class="summary-icon">${icon}</span>
+          ${a.text}
+        </div>`;
       });
-      updateCalculations();
     }
 
-    function toggleCorrectionFactor() {
-      const checkbox = document.getElementById('useCorrectionFactor');
-      const correctionFactorInput = document.getElementById('correctionFactor');
-      const headerRow = document.getElementById('headerRow');
-      const totalCorrectedAirflowRow = document.getElementById('totalCorrectedAirflowRow');
+    saveState();
+  }
 
-      if (checkbox.checked) {
-        correctionFactorInput.style.display = 'inline-block';
-        if (!headerRow.cells[3] || headerRow.cells[3].innerText !== 'Corr. Flow')
-          headerRow.insertCell(3).outerHTML = '<th>Corr. Flow</th>';
-        totalCorrectedAirflowRow.style.display = 'block';
-      } else {
-        correctionFactorInput.style.display = 'none';
-        if (headerRow.cells[3] && headerRow.cells[3].innerText === 'Corr. Flow')
-          headerRow.deleteCell(3);
-        totalCorrectedAirflowRow.style.display = 'none';
-      }
+  // ── EXPORT CSV ───────────────────────────────────────
+  function exportCSV() {
+    const fanName = document.getElementById('fanName').value || 'System';
+    const fanSpeed = document.getElementById('fanSpeed').value;
+    const useCF = document.getElementById('useCorrectionFactor').checked;
+    const cf = document.getElementById('correctionFactor').value;
+    const date = new Date().toLocaleDateString();
 
-      updateCalculations();
-      saveState();
-    }
+    let rows = [
+      ['Airflow Balancing Report'],
+      [`Fan/System: ${fanName}`, `Date: ${date}`],
+      [`Current Fan Speed: ${fanSpeed}%`, useCF ? `Correction Factor: ${cf}` : ''],
+      [],
+      ['Grille', 'Required Flow', 'Current Flow', useCF ? 'Corrected Flow' : null, 'Current Damper (%)', 'Rec. Damper (%)', '% of Total'].filter(Boolean),
+    ];
 
-    function addGrille(name = '', required = '', current = '', damper = '100') {
-      grilleCount++;
-      const table = document.getElementById('grilleTable');
-      const row = table.insertRow(-1);
-      let cellIndex = 0;
-      row.insertCell(cellIndex++).innerHTML = `<input type="text" placeholder="Grille ${grilleCount}" value="${name}" onchange="updateCalculations()">`;
-      row.insertCell(cellIndex++).innerHTML = `<input type="number" placeholder="Required" value="${required}" onchange="updateCalculations()">`;
-      row.insertCell(cellIndex++).innerHTML = `<input type="number" placeholder="Current" value="${current}" onchange="updateCalculations()">`;
-      if (document.getElementById('useCorrectionFactor').checked) row.insertCell(cellIndex++).innerHTML = '';
-      row.insertCell(cellIndex++).innerHTML = `<input type="number" value="${damper}" min="0" max="100" onchange="updateCalculations()">`;
-      row.insertCell(cellIndex++).innerHTML = '<span></span>';
-      row.insertCell(cellIndex++).innerHTML = '';
-      row.insertCell(cellIndex++).innerHTML = '<button onclick="removeGrille(this)">Remove</button>';
-      updateCalculations();
-      saveState();
-    }
+    const useCFon = document.getElementById('useCorrectionFactor').checked;
+    const cfVal = useCFon ? (parseFloat(document.getElementById('correctionFactor').value) || 1.0) : 1.0;
+    let totalCurrent = 0, totalCorrected = 0, totalRequired = 0;
 
-    function removeGrille(button) {
-      button.closest('tr').remove();
-      updateCalculations();
-      saveState();
-    }
+    const data = grilles.map(g => {
+      const name = document.getElementById('gname-' + g.id)?.value || '';
+      const req = parseFloat(document.getElementById('greq-' + g.id)?.value) || 0;
+      const cur = parseFloat(document.getElementById('gcur-' + g.id)?.value) || 0;
+      const damp = parseFloat(document.getElementById('gdamp-' + g.id)?.value) || 100;
+      const corr = cur * cfVal;
+      totalCurrent += cur;
+      totalCorrected += corr;
+      totalRequired += req;
+      return { name, req, cur, damp, corr };
+    });
 
-    function clearAll() {
-      if (!confirm('Clear all data (this will also remove saved data)?')) return;
-      const table = document.getElementById('grilleTable');
-      while (table.rows.length > 1) table.deleteRow(1);
-      grilleCount = 0;
-      localStorage.removeItem('airflowToolState');
-      updateCalculations();
-    }
+    const effectiveTotal = useCFon ? totalCorrected : totalCurrent;
+    const recFanSpeed = effectiveTotal > 0
+      ? Math.max(0, Math.min(100, Math.round((totalRequired / effectiveTotal) * (parseFloat(fanSpeed) || 0))))
+      : 0;
+    const fanSpeedRatio = recFanSpeed / ((parseFloat(fanSpeed) || 1));
 
-    function sortGrilles() {
-      const table = document.getElementById('grilleTable');
-      const rows = Array.from(table.rows).slice(1);
-      rows.sort((a, b) => {
-        const nameA = a.cells[0].querySelector('input').value.toLowerCase();
-        const nameB = b.cells[0].querySelector('input').value.toLowerCase();
-        return nameA.localeCompare(nameB);
-      });
-      while (table.rows.length > 1) table.deleteRow(1);
-      rows.forEach(row => table.appendChild(row));
-      updateCalculations();
-      saveState();
-    }
+    data.forEach(g => {
+      const projected = (useCFon ? g.corr : g.cur) * fanSpeedRatio;
+      let recDamper = g.damp;
+      if (projected > 0 && g.req > 0) recDamper = Math.max(0, Math.min(100, Math.round((g.req / projected) * g.damp)));
+      const pct = effectiveTotal > 0 ? ((useCFon ? g.corr : g.cur) / effectiveTotal * 100).toFixed(1) + '%' : '—';
+      const row = [g.name, g.req, g.cur, useCFon ? g.corr.toFixed(2) : null, g.damp + '%', recDamper + '%', pct].filter(v => v !== null);
+      rows.push(row);
+    });
 
-    function updateCalculations() {
-      const table = document.getElementById('grilleTable');
-      const rows = table.rows;
-      let totalCurrentAirflow = 0;
-      let totalCorrectedAirflow = 0;
-      let totalRequiredAirflow = 0;
-      let changes = [];
-      let grilles = [];
+    rows.push([]);
+    rows.push(['', 'Totals']);
+    rows.push(['Total Current', totalCurrent.toFixed(1)]);
+    if (useCFon) rows.push(['Total Corrected', totalCorrected.toFixed(1)]);
+    rows.push(['Total Required', totalRequired.toFixed(1)]);
+    rows.push(['Recommended Fan Speed', recFanSpeed + '%']);
 
-      const useCorrectionFactor = document.getElementById('useCorrectionFactor').checked;
-      const correctionFactor = useCorrectionFactor ? (parseFloat(document.getElementById('correctionFactor').value) || 1.0) : 1.0;
+    const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `airflow-${(fanName || 'report').replace(/\s+/g, '-').toLowerCase()}-${date.replace(/\//g, '-')}.csv`;
+    a.click();
+  }
 
-      for (let i = 1; i < rows.length; i++) {
-        const label = rows[i].cells[0].querySelector('input').value;
-        const required = parseFloat(rows[i].cells[1].querySelector('input').value) || 0;
-        const current = parseFloat(rows[i].cells[2].querySelector('input').value) || 0;
-        const corrected = current * correctionFactor;
-        const currentDamperIndex = useCorrectionFactor ? 4 : 3;
-        const currentDamper = parseFloat(rows[i].cells[currentDamperIndex].querySelector('input').value) || 100;
-
-        totalCurrentAirflow += current;
-        totalCorrectedAirflow += corrected;
-        totalRequiredAirflow += required;
-
-        grilles.push({ label, required, current, corrected, currentDamper, index: i });
-        if (useCorrectionFactor) rows[i].cells[3].textContent = corrected.toFixed(2);
-      }
-
-      const currentFanSpeed = parseFloat(document.getElementById('fanSpeed').value) || 50;
-      const recommendedFanSpeed = Math.round((totalRequiredAirflow / (useCorrectionFactor ? totalCorrectedAirflow : totalCurrentAirflow)) * currentFanSpeed);
-      const fanSpeedRatio = recommendedFanSpeed / currentFanSpeed;
-
-      const recommendedFanSpeedElement = document.getElementById('recommendedFanSpeed');
-      recommendedFanSpeedElement.textContent = `${recommendedFanSpeed}%`;
-      recommendedFanSpeedElement.classList.toggle('needs-change', recommendedFanSpeed !== currentFanSpeed);
-
-      for (let grille of grilles) {
-        let projectedAirflow = (useCorrectionFactor ? grille.corrected : grille.current) * fanSpeedRatio;
-        let recommendedDamper = grille.currentDamper;
-
-        if (projectedAirflow > grille.required) recommendedDamper = Math.round((grille.required / projectedAirflow) * grille.currentDamper);
-        else if (projectedAirflow < grille.required) recommendedDamper = Math.min(100, Math.round((grille.required / projectedAirflow) * grille.currentDamper));
-
-        recommendedDamper = Math.max(0, Math.min(100, recommendedDamper));
-
-        const recDamperIndex = useCorrectionFactor ? 5 : 4;
-        const percentIndex = useCorrectionFactor ? 6 : 5;
-
-        const recCell = rows[grille.index].cells[recDamperIndex];
-        recCell.innerHTML = `<span>${recommendedDamper}%</span>`;
-        recCell.classList.toggle('highlight', recommendedDamper !== grille.currentDamper);
-
-        const percentageOfTotal = ((useCorrectionFactor ? grille.corrected : grille.current) / (useCorrectionFactor ? totalCorrectedAirflow : totalCurrentAirflow)) * 100;
-        rows[grille.index].cells[percentIndex].textContent = `${percentageOfTotal.toFixed(2)}%`;
-
-        if (recommendedDamper !== grille.currentDamper) changes.push(`Adjust grille ${grille.label} damper from ${grille.currentDamper}% to ${recommendedDamper}%`);
-      }
-
-      document.getElementById('totalAirflow').textContent = totalCurrentAirflow.toFixed(2);
-      document.getElementById('totalCorrectedAirflow').textContent = totalCorrectedAirflow.toFixed(2);
-      document.getElementById('totalRequiredAirflow').textContent = totalRequiredAirflow.toFixed(2);
-      document.getElementById('percentageRequiredAirflow').textContent = `${((useCorrectionFactor ? totalCorrectedAirflow : totalCurrentAirflow) / totalRequiredAirflow * 100).toFixed(2)}%`;
-      document.getElementById('averageAirflow').textContent = ((useCorrectionFactor ? totalCorrectedAirflow : totalCurrentAirflow) / (rows.length - 1)).toFixed(2);
-
-      let summary = '';
-      if (recommendedFanSpeed !== currentFanSpeed) summary += `Adjust fan speed from ${currentFanSpeed}% to ${recommendedFanSpeed}%\n`;
-      summary += changes.join('\n');
-      document.getElementById('summary').textContent = summary;
-
-      saveState();
-    }
-
-    window.onload = loadState;
-  </script>
+  window.onload = loadState;
+</script>
 </body>
 </html>
